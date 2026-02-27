@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BookTok Studio</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,600;8..144,700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0b0b0b; color: #ddd; font-family: 'Roboto Flex', sans-serif; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useRef, useCallback, useEffect } = React;
+
+const COLOR_MAP = {
+  male: "#B5CDFD", female: "#FEC2D3", internal: "#FFF8B3", other: "#FDD9B0", narrative: null,
+  male_flow: "#B5CDFD", female_flow: "#FEC2D3", internal_flow: "#FFF8B3", other_flow: "#FDD9B0", narrative_flow: null,
+  male_underline: "#B5CDFD", female_underline: "#FEC2D3", internal_underline: "#FFF8B3", other_underline: "#FDD9B0", narrative_underline: null,
+  male_italic: "#B5CDFD", female_italic: "#FEC2D3", internal_italic: "#FFF8B3", other_italic: "#FDD9B0", narrative_italic: null,
+  male_italic_flow: "#B5CDFD", female_italic_flow: "#FEC2D3", internal_italic_flow: "#FFF8B3", other_italic_flow: "#FDD9B0", narrative_italic_flow: null,
+  male_bold: "#B5CDFD", female_bold: "#FEC2D3", internal_bold: "#FFF8B3", other_bold: "#FDD9B0", narrative_bold: null,
+  male_bold_flow: "#B5CDFD", female_bold_flow: "#FEC2D3", internal_bold_flow: "#FFF8B3", other_bold_flow: "#FDD9B0", narrative_bold_flow: null,
+  male_bold_underline: "#B5CDFD", female_bold_underline: "#FEC2D3", internal_bold_underline: "#FFF8B3", other_bold_underline: "#FDD9B0", narrative_bold_underline: null,
+  male_bold_italic: "#B5CDFD", female_bold_italic: "#FEC2D3", internal_bold_italic: "#FFF8B3", other_bold_italic: "#FDD9B0", narrative_bold_italic: null,
+  male_bold_italic_flow: "#B5CDFD", female_bold_italic_flow: "#FEC2D3", internal_bold_italic_flow: "#FFF8B3", other_bold_italic_flow: "#FDD9B0", narrative_bold_italic_flow: null,
+  male_bold_italic_underline: "#B5CDFD", female_bold_italic_underline: "#FEC2D3", internal_bold_italic_underline: "#FFF8B3", other_bold_italic_underline: "#FDD9B0", narrative_bold_italic_underline: null,
+  male_italic_underline: "#B5CDFD", female_italic_underline: "#FEC2D3", internal_italic_underline: "#FFF8B3", other_italic_underline: "#FDD9B0", narrative_italic_underline: null,
+};
+const VIBES = ["Bantering & Sexual Tension","Angst","Possessive / Jealousy","Forced Proximity","Enemies to Lovers Turning Point","Soft Vulnerability","Dark & Obsessive","Touch Her and Die","He Falls First","Grumpy / Sunshine","Slow Burn Payoff","Forbidden"];
+const GEMINI_MODELS = [{id:"gemini-3-pro-preview",label:"Gemini 3 Pro"},{id:"gemini-3.1-pro-preview",label:"Gemini 3.1 Pro (newest)"},{id:"gemini-3-flash-preview",label:"Gemini 3 Flash"},{id:"gemini-2.5-flash",label:"Gemini 2.5 Flash"}];
+const FONT_OPTIONS = ["Lora","Literata","Gupter","Crimson Text","Source Serif 4","Merriweather","EB Garamond","DejaVu Serif"];
+const DEJAVU_CDN = "https://cdn.jsdelivr.net/gh/dejavu-fonts/dejavu-fonts@master/ttf/DejaVuSerif.ttf";
+const UI_FONT = "'Roboto Flex', sans-serif";
+
+const PROJECT_MAP = [
+  { initials: "RE", authors: ["Veda Rose", "Lila Blair", "Zara Blaze", "Liv Raven"] },
+  { initials: "DK", authors: ["Lys Kane", "Lux Devon", "Lexi Asher"] },
+  { initials: "PV", authors: ["Zoya Carter", "Lara Hart", "Alessia Reid"] },
+];
+function getProject(authorField) {
+  if (!authorField) return null;
+  const lower = authorField.toLowerCase();
+  for (const p of PROJECT_MAP) {
+    for (const a of p.authors) {
+      if (lower.includes(a.toLowerCase())) return p.initials;
+    }
+  }
+  return null;
+}
+
+const GEMINI_SYSTEM_PROMPT = `Role: You are a viral BookTok strategist.
+Goal: Analyze the uploaded book and output marketing assets.
+
+Output Structure:
+1. The Hook (Slide 1): ONE punchy sentence, third person, max 10-15 words. High curiosity.
+
+2. The Caption: Format EXACTLY like this with line breaks (NOT slashes):
+[Short emotional reaction, max 5-6 words]
+📚 : [Title In Title Case] by [Author Name]
+[tropes in lowercase separated by periods]
+
+Example caption:
+The way he chose her over everything
+📚 : Twisted Love by Ana Huang
+dark romance. possessive hero. brother's best friend. enemies to lovers.
+
+CAPTION RULES:
+- First line: emotional reaction, NO emoji
+- Second line: 📚 : then book title in Title Case (NOT ALL CAPS), then by Author
+- Third line: tropes in lowercase separated by periods, end each with a period
+- Use line breaks between each line, NOT slashes
+
+3. The Context: 2-4 sentences about the scene.
+
+4. The Transfer Data: Extract contiguous 100-125 word excerpt.
+
+EXCERPT SELECTION RULES — THIS IS CRITICAL FOR TIKTOK:
+The excerpt MUST be dialogue-heavy. TikTok viewers scroll fast — walls of narrative text lose them immediately.
+
+GOOD excerpt: mostly short back-and-forth dialogue lines, with brief narrative beats or internal thoughts that add tension or context.
+BAD excerpt: long paragraphs of description, action, or backstory with only occasional dialogue.
+
+When choosing your excerpt:
+- Dialogue + internal thought should make up at least 60-70% of the word count
+- Narrative lines should be SHORT (1-2 sentences max) and only kept if they add crucial emotional context
+- Prioritise excerpts with punchy, short exchanges over long speeches
+- A character's brief internal reaction to dialogue is fine — a full paragraph of scene-setting is not
+- If the vibe scene has too much narrative, find the closest dialogue-heavy moment nearby instead
+
+EXCERPT ACCURACY RULES — DO NOT PARAPHRASE OR MERGE:
+- Copy dialogue EXACTLY as it appears in the book. Do not reword, rephrase, combine, or condense.
+- If the book has two separate lines of dialogue, they MUST be two separate tuples. NEVER merge them into one.
+- If Character A says "Line 1." and then on a new line says "Line 2." — those are TWO separate tuples, not one.
+- Narration between dialogue lines must also be kept as separate tuples. Do NOT glue narration onto dialogue.
+- The excerpt should read exactly like the book — your job is to TRANSCRIBE it into tuple format, not rewrite it.
+
+WRONG — merging two separate dialogue lines into one tuple:
+  (""What's this, jealousy? Or disappointment that I haven't given you a chance?"", "male")
+CORRECT — each line from the book is its own tuple:
+  (""What's this, jealousy?"", "male_flow"),
+  (" he asked.", "narrative"),
+  (""Or disappointment that I haven't given you a chance?"", "male")
+
+WRONG — merging dialogue + narration + more dialogue:
+  (""Beg you? I'll never beg you for anything. Ever!"" He leaned in close.", "female")
+CORRECT — split faithfully:
+  (""Beg you?"", "female_flow"),
+  (" I scoffed.", "narrative"),
+  (""I'll never beg you for anything. Ever!"", "female"),
+  (" He leaned in close.", "narrative")
+
+CRITICAL TUPLE FORMATTING RULES:
+- Each tuple is: ("text content", "tag")
+- For DIALOGUE: use doubled straight quotes as the quotation marks INSIDE the string.
+  Example dialogue tuple: (""Hello there,"", "male")
+  The outer quotes are Python string delimiters. The inner doubled quotes "" are the dialogue marks.
+- For NARRATIVE with no dialogue: ("She turned away.", "narrative")
+- Do NOT use curly/smart quotes. Do NOT use triple quotes. Do NOT use escaped quotes.
+- Just use doubled straight quotes "" for dialogue marks inside the text.
+- Base tags: male, female, narrative, internal, other
+- Modifier suffixes (combine with base): _flow, _underline, _bold, _italic
+- Combined examples: male_flow, female_bold, narrative_italic, male_bold_italic, female_italic_underline, male_bold_flow, female_italic_flow, male_bold_italic_flow, female_bold_italic_underline
+- Use _bold for bold text, _italic for italic text, combine freely: male_bold, female_italic, narrative_bold_italic
+- _underline = emotional peak dialogue or internal thought only. NEVER use narrative_underline. Max ONE underline tag total.
+- Censor ALL explicit words with asterisks: f*ck, sh*t, d*mn, c*ck, cl*t, p*ssy, d*ck, c*m, c*nt, m*ans, po*nd, etc.
+- 1-2 internal tags max
+- Leading space rule: ONLY the speech-tag continuation in a _flow pair starts with a space (e.g. " she said."). New paragraphs NEVER start with a space.
+
+=== SPLITTING RULE — THIS IS THE MOST CRITICAL RULE OF ALL ===
+
+EVERY TUPLE MUST CONTAIN ONLY ONE TYPE OF CONTENT:
+- Either dialogue (in quotation marks)
+- OR narration/speech-tag (no quotation marks)
+- NEVER BOTH in the same tuple
+
+WRONG — speech-tag + new dialogue jammed into one tuple:
+  (" I hissed. ""Did you set the fire just so you could kidnap me?""", "narrative")
+CORRECT — split them into SEPARATE tuples:
+  (" I hissed.", "narrative"),
+  (""Did you set the fire just so you could kidnap me?"", "female")
+
+WRONG — mixing continuation + new dialogue in one tuple:
+  (" I admitted on a long sigh. ""Maybe we can watch another movie someday.""", "narrative")
+CORRECT — split them into separate tuples:
+  (" I admitted on a long sigh.", "narrative"),
+  (""Maybe we can watch another movie someday."", "female")
+
+WRONG — dialogue + speech-tag in same tuple:
+  (""Hello,"" he said.", "male")
+CORRECT — split with _flow:
+  (""Hello,"", "male_flow"),
+  (" he said.", "narrative")
+
+Before finalising, scan EVERY tuple. If any tuple contains BOTH "" marks AND non-dialogue text outside those marks, SPLIT IT.
+
+NEVER USE TRIPLE QUOTES. This is always wrong:
+  ("""Fine,""", "female")  ← WRONG: triple quotes
+  (""Fine,"", "female_flow")  ← CORRECT: doubled quotes only
+
+_flow RULES — THIS IS THE #1 MOST COMMON MISTAKE. READ VERY CAREFULLY:
+
+When dialogue and a speech tag appear on the SAME LINE in the book, you must split them into two tuples. The _flow tag tells the renderer to keep them on the same visual line.
+
+CRITICAL: _flow goes on the DIALOGUE piece. The narrative/speech-tag piece gets a PLAIN tag.
+
+PATTERN:
+  "Dialogue here," he said softly.
+  becomes:
+  (""Dialogue here,"", "male_flow"),
+  (" he said softly.", "narrative")
+
+MORE EXAMPLES:
+
+  "Stay," she whispered.
+  (""Stay,"", "female_flow"),
+  (" she whispered.", "narrative")
+
+  "What are you doing?" I asked.
+  (""What are you doing?"", "female_flow"),
+  (" I asked.", "narrative")
+
+  "How dare you!" she snapped.
+  (""How dare you!"", "female_flow"),
+  (" she snapped.", "narrative")
+
+  "Is that so?" he murmured.
+  (""Is that so?"", "male_flow"),
+  (" he murmured.", "narrative")
+
+  "I don't care," I say honestly.
+  (""I don't care,"", "male_flow"),
+  (" I say honestly.", "narrative")
+
+  "Say it." (standalone dialogue, own paragraph)
+  (""Say it."", "male")
+  ← NO _flow because nothing continues on this line
+
+_flow applies whenever a speech tag follows dialogue on the same line — regardless of whether the dialogue ends with a COMMA, QUESTION MARK, or EXCLAMATION MARK.
+
+NEVER DO THIS — these are all WRONG:
+  (""Stay,"", "female"),       ← WRONG: needs female_flow when speech tag follows on same line
+  (""What are you doing?"", "female"), (" I asked.", "narrative")  ← WRONG: needs female_flow (question mark)
+  (" she whispered.", "narrative_flow")  ← WRONG: narrative_flow should almost NEVER be used
+
+  (""Say it."", "male_flow"),  ← WRONG: standalone dialogue with no continuation should be plain "male"
+  (" The words hit hard.", "narrative_flow")  ← WRONG: new paragraph = plain "narrative"
+
+REMEMBER:
+- _flow = DIALOGUE tag (male_flow, female_flow) when a speech tag follows on the same line
+- The speech tag after it = PLAIN narrative (with leading space)
+- narrative_flow should almost NEVER appear. If you find yourself writing narrative_flow, you are probably making a mistake.
+- Standalone dialogue on its own line = plain tag, NO _flow
+- New paragraphs = plain tags, NEVER _flow
+
+Output each section with these exact headers:
+**Hook:**
+**Caption:**
+**Context:**
+**Transfer Data:**`;
+
+// === IndexedDB v3 with categories + books ===
+const DB_NAME="booktok_photos", DB_VER=3, STORE="photos", CAT_STORE="categories", BOOK_STORE="books";
+function openDB(){return new Promise((s,j)=>{
+  const r=indexedDB.open(DB_NAME,DB_VER);
+  r.onupgradeneeded=()=>{
+    const db=r.result;
+    if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:"id"});
+    if(!db.objectStoreNames.contains(CAT_STORE))db.createObjectStore(CAT_STORE,{keyPath:"id"});
+    if(!db.objectStoreNames.contains(BOOK_STORE))db.createObjectStore(BOOK_STORE,{keyPath:"id"});
+  };
+  r.onsuccess=()=>s(r.result);r.onerror=()=>j(r.error);
+})}
+async function dbPut(p){const db=await openDB();return new Promise((s,j)=>{const t=db.transaction(STORE,"readwrite");t.objectStore(STORE).put(p);t.oncomplete=s;t.onerror=()=>j(t.error)})}
+async function dbGetAll(){const db=await openDB();return new Promise((s,j)=>{const t=db.transaction(STORE,"readonly");const r=t.objectStore(STORE).getAll();r.onsuccess=()=>s(r.result);r.onerror=()=>j(r.error)})}
+async function dbDel(id){const db=await openDB();return new Promise((s,j)=>{const t=db.transaction(STORE,"readwrite");t.objectStore(STORE).delete(id);t.oncomplete=s;t.onerror=()=>j(t.error)})}
+async function dbSaveCats(cats){const db=await openDB();return new Promise((s,j)=>{const t=db.transaction(CAT_STORE,"readwrite");const st=t.objectStore(CAT_STORE);st.clear();cats.forEach(c=>st.put(c));t.oncomplete=s;t.onerror=()=>j(t.error)})}
+async function dbGetCats(){const db=await openDB();return new Promise((s,j)=>{const t=db.transaction(CAT_STORE,"readonly");const r=t.objectStore(CAT_STORE).getAll();r.onsuccess=()=>s(r.result);r.onerror=()=>j(r.error)})}
+async function dbPutBook(b){const db=await openDB();return new Promise((s,j)=>{const t=db.transaction(BOOK_STORE,"readwrite");t.objectStore(BOOK_STORE).put(b);t.oncomplete=s;t.onerror=()=>j(t.error)})}
+async function dbGetBooks(){const db=await openDB();return new Promise((s,j)=>{const t=db.transaction(BOOK_STORE,"readonly");const r=t.objectStore(BOOK_STORE).getAll();r.onsuccess=()=>s(r.result);r.onerror=()=>j(r.error)})}
+async function dbDelBook(id){const db=await openDB();return new Promise((s,j)=>{const t=db.transaction(BOOK_STORE,"readwrite");t.objectStore(BOOK_STORE).delete(id);t.oncomplete=s;t.onerror=()=>j(t.error)})}
+
+function fileToB64(f){return new Promise((s,j)=>{const r=new FileReader();r.onload=()=>s(r.result);r.onerror=j;r.readAsDataURL(f)})}
+function resizeImg(d,mW=200){return new Promise(s=>{const i=new Image();i.onload=()=>{const sc=Math.min(1,mW/i.width);const c=document.createElement("canvas");c.width=i.width*sc;c.height=i.height*sc;c.getContext("2d").drawImage(i,0,0,c.width,c.height);s(c.toDataURL("image/jpeg",0.7))};i.src=d})}
+function parseTupleData(raw) {
+  const entries = [];
+
+  // STRATEGY 1: Line-by-line robust parsing
+  // Handles: doubled "" quotes, triple """, curly quotes, and plain strings
+  const lines = raw.split('\n');
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t.startsWith('(')) continue;
+    const tagMatch = t.match(/,\s*"(\w+)"\s*\)\s*,?\s*$/);
+    if (!tagMatch) continue;
+    const tag = tagMatch[1];
+    const tagPart = tagMatch[0];
+    const tagStart = t.lastIndexOf(tagPart);
+    let inner = t.substring(1, tagStart).trim();
+
+    // Count leading and trailing straight quotes
+    let leadQ = 0, trailQ = 0;
+    while (leadQ < inner.length && inner[leadQ] === '"') leadQ++;
+    while (trailQ < inner.length && inner[inner.length - 1 - trailQ] === '"') trailQ++;
+
+    if (leadQ >= 3 && trailQ >= 3) {
+      // Triple or more quotes — strip outer string delimiter AND extra dialogue quotes, keep one pair
+      inner = inner.substring(leadQ - 1, inner.length - (trailQ - 1));
+    } else if (leadQ >= 2 && trailQ >= 2) {
+      // Doubled quotes — strip all but 1 from each side (normal dialogue format)
+      inner = inner.substring(leadQ - 1, inner.length - (trailQ - 1));
+    } else if (leadQ >= 1 && trailQ >= 1) {
+      // Single quotes — just the string delimiters
+      inner = inner.substring(1, inner.length - 1);
+    }
+
+    // Convert remaining straight " to curly quotes (open/close toggle)
+    let result = '';
+    // If text starts with a space, it's a flow continuation — first " should be closing
+    let nextIsOpen = !inner.startsWith(' ');
+    for (let ci = 0; ci < inner.length; ci++) {
+      if (inner[ci] === '"') {
+        result += nextIsOpen ? '\u201C' : '\u201D';
+        nextIsOpen = !nextIsOpen;
+      } else {
+        result += inner[ci];
+      }
+    }
+
+    result = result.replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
+    if (result) entries.push({ text: result, tag });
+  }
+  if (entries.length > 0) return entries;
+
+  // STRATEGY 2: Regex fallback for compact/single-line formats
+  let normalized = raw.replace(/\u201C|\u201D/g, '"').replace(/\u2018|\u2019/g, "'");
+  normalized = normalized.replace(/""{2,}/g, '"');
+  const regex = /\(\s*"((?:[^"\\]|\\.)*)"\s*,\s*"(\w+)"\s*\)/g;
+  let m;
+  while ((m = regex.exec(normalized)) !== null) {
+    let text = m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+    entries.push({ text, tag: m[2] });
+  }
+  if (entries.length > 0) return entries;
+
+  // STRATEGY 3: Single-quote fallback
+  const regexS = /\(\s*'((?:[^'\\]|\\.)*)'\s*,\s*'(\w+)'\s*\)/g;
+  while ((m = regexS.exec(normalized)) !== null) {
+    let text = m[1].replace(/\\n/g, '\n').replace(/\\'/g, "'").replace(/\\\\/g, '\\');
+    entries.push({ text, tag: m[2] });
+  }
+  return entries;
+}
+
+function isFlowTag(tag) { return tag.endsWith("_flow") || tag.endsWith("_italic_flow") || tag.endsWith("_bold_italic_flow") || tag.endsWith("_bold_flow"); }
+function isUnderlineTag(tag) { return tag.includes("_underline"); }
+function isItalicTag(tag) { return tag.includes("_italic"); }
+function isBoldTag(tag) { return tag.includes("_bold"); }
+function isBoldItalicTag(tag) { return tag.includes("_bold_italic"); }
+function getHL(tag) { return COLOR_MAP[tag] || null; }
+function hasCensor(w) { return w.includes("*"); }
+
+function buildGroups(entries) {
+  if (!entries.length) return [];
+  const g = []; let c = [];
+  let inFlowGroup = false;
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    const eIsFlow = isFlowTag(e.tag);
+    const eStartsNewParagraph = !e.text.startsWith(' ') && !eIsFlow;
+    
+    if (inFlowGroup) {
+      if (eIsFlow) {
+        // Another _flow piece continues the group (mid-sentence style change)
+        c.push(e);
+      } else if (e.text.startsWith(' ')) {
+        // Speech tag continuation — finishes the flow group
+        c.push(e);
+        inFlowGroup = false;
+      } else if (!eStartsNewParagraph && (isBoldTag(e.tag) || isItalicTag(e.tag))) {
+        // Bold/italic mid-sentence fragment (no leading space, not _flow, but styled)
+        // e.g. ("needed", "male_italic") between flow pieces
+        c.push(e);
+      } else {
+        // New paragraph — close current group, start fresh
+        if (c.length) g.push(c);
+        c = [e];
+        inFlowGroup = false;
+      }
+    } else {
+      if (eIsFlow) {
+        // Start a new flow group
+        if (c.length) g.push(c);
+        c = [e];
+        inFlowGroup = true;
+      } else {
+        // Standalone entry — new group
+        if (c.length) g.push(c);
+        c = [e];
+        inFlowGroup = false;
+      }
+    }
+  }
+  if (c.length) g.push(c);
+  return g;
+}
+
+function renderKindle(canvas, groups, scale, fontName, fontSize) {
+  const S = scale;
+  const ctx = canvas.getContext('2d');
+  const baseW = Math.round(540 * (fontSize / 20));
+  const CW = baseW * S;
+  const MX = Math.round(36 * (fontSize / 20)) * S;
+  const MTW = CW - MX * 2;
+  const FS = fontSize * S;
+  const LH = Math.round(FS * 1.55);
+  const PG = Math.round(FS * 0.45);
+  const IND = Math.round(FS * 1.5);
+  const TM = 28 * S;
+  const BM = 28 * S;
+  const HLP_T = Math.round(3 * S);
+  const HLP_B = Math.round(5 * S);
+  const fontStr = `500 ${FS}px "${fontName}", Georgia, serif`;
+  ctx.font = fontStr;
+
+  function tokenize(group) {
+    const tokens = [];
+    for (const entry of group) {
+      const parts = entry.text.split(/( +)/);
+      for (const p of parts) {
+        if (p === '') continue;
+        tokens.push({ text: p, tag: entry.tag, isSp: /^ +$/.test(p) });
+      }
+    }
+    return tokens;
+  }
+
+  function layoutLines(tokens, indent) {
+    const lines = [];
+    let cur = [], curW = 0;
+    let sx = indent, mw = MTW - indent, first = true;
+    function tagFont(tag) {
+      const bold = isBoldTag(tag);
+      const italic = isItalicTag(tag);
+      if (bold && italic) return `italic 700 ${FS}px "${fontName}", Georgia, serif`;
+      if (bold) return `700 ${FS}px "${fontName}", Georgia, serif`;
+      if (italic) return `italic 500 ${FS}px "${fontName}", Georgia, serif`;
+      return fontStr;
+    }
+    for (const t of tokens) {
+      if (t.isSp) {
+        if (cur.length > 0) {
+          ctx.font = tagFont(t.tag);
+          curW += ctx.measureText(t.text).width; cur.push(t);
+        }
+        continue;
+      }
+      ctx.font = tagFont(t.tag);
+      const ww = ctx.measureText(t.text).width;
+      if (cur.length > 0 && curW + ww > mw) {
+        while (cur.length && cur[cur.length - 1].isSp) {
+          ctx.font = tagFont(cur[cur.length-1].tag);
+          curW -= ctx.measureText(cur.pop().text).width;
+        }
+        lines.push({ tokens: cur, w: curW, indent: sx, just: true });
+        cur = []; curW = 0;
+        if (first) { first = false; sx = 0; mw = MTW; }
+      }
+      cur.push(t); curW += ww;
+    }
+    if (cur.length) {
+      while (cur.length && cur[cur.length - 1].isSp) cur.pop();
+      lines.push({ tokens: cur, w: curW, indent: sx, just: false });
+    }
+    ctx.font = fontStr;
+    return lines;
+  }
+
+  const allLines = [];
+  for (let g = 0; g < groups.length; g++) {
+    allLines.push(layoutLines(tokenize(groups[g]), IND));
+  }
+
+  let nLines = 0;
+  for (const gl of allLines) nLines += gl.length;
+  const totalH = TM + nLines * LH + (allLines.length - 1) * PG + BM;
+  canvas.width = CW;
+  canvas.height = totalH;
+  canvas.style.width = baseW + 'px';
+  canvas.style.height = (totalH / S) + 'px';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, CW, totalH);
+  ctx.font = fontStr;
+  ctx.textBaseline = 'alphabetic';
+  const asc = ctx.measureText('Mg').actualBoundingBoxAscent || FS * 0.76;
+
+  // PASS 1: Compute word positions
+  const lineData = [];
+  let y = TM;
+  for (let g = 0; g < allLines.length; g++) {
+    for (const line of allLines[g]) {
+      const bx = MX + line.indent;
+      const words = line.tokens.filter(t => !t.isSp);
+      let tww = 0;
+      for (const w of words) {
+        const bold = isBoldTag(w.tag), italic = isItalicTag(w.tag);
+        ctx.font = bold && italic ? `italic 700 ${FS}px "${fontName}", Georgia, serif` : bold ? `700 ${FS}px "${fontName}", Georgia, serif` : italic ? `italic 500 ${FS}px "${fontName}", Georgia, serif` : fontStr;
+        tww += ctx.measureText(w.text).width;
+      }
+      ctx.font = fontStr;
+      const sw = (line.just && words.length > 1)
+        ? (MTW - line.indent - tww) / (words.length - 1)
+        : ctx.measureText(' ').width;
+      const wps = [];
+      let dx = bx;
+      for (let i = 0; i < words.length; i++) {
+        const bold = isBoldTag(words[i].tag), italic = isItalicTag(words[i].tag);
+        ctx.font = bold && italic ? `italic 700 ${FS}px "${fontName}", Georgia, serif` : bold ? `700 ${FS}px "${fontName}", Georgia, serif` : italic ? `italic 500 ${FS}px "${fontName}", Georgia, serif` : fontStr;
+        const ww = ctx.measureText(words[i].text).width;
+        wps.push({ x: dx, w: ww, tok: words[i] });
+        dx += ww + (i < words.length - 1 ? sw : 0);
+      }
+      ctx.font = fontStr;
+      lineData.push({ y, wps, indent: line.indent, groupIdx: g });
+      y += LH;
+    }
+    if (g < allLines.length - 1) y += PG;
+  }
+
+  // PASS 2: Highlights with multi-line spanning
+  for (let li = 0; li < lineData.length; li++) {
+    const ld = lineData[li];
+    const { y: ly, wps } = ld;
+    let hi = 0;
+    while (hi < wps.length) {
+      const col = getHL(wps[hi].tok.tag);
+      if (!col) { hi++; continue; }
+      let he = hi;
+      while (he + 1 < wps.length && getHL(wps[he + 1].tok.tag) === col) he++;
+      const isFirstWord = hi === 0;
+      const isLastWord = he === wps.length - 1;
+      const prevLine = li > 0 ? lineData[li - 1] : null;
+      const sameGroupAsPrev = prevLine && prevLine.groupIdx === ld.groupIdx;
+      const prevLastCol = (sameGroupAsPrev && prevLine.wps.length > 0) ? getHL(prevLine.wps[prevLine.wps.length - 1].tok.tag) : null;
+      const continuesFromPrev = isFirstWord && prevLastCol === col;
+      const nextLine = li < lineData.length - 1 ? lineData[li + 1] : null;
+      const sameGroupAsNext = nextLine && nextLine.groupIdx === ld.groupIdx;
+      const nextFirstCol = (sameGroupAsNext && nextLine.wps.length > 0) ? getHL(nextLine.wps[0].tok.tag) : null;
+      const continuesToNext = isLastWord && nextFirstCol === col;
+      const rx = continuesFromPrev ? MX : wps[hi].x;
+      const rEndX = continuesToNext ? (CW - MX) : (wps[he].x + wps[he].w);
+      const rt = ly - HLP_T;
+      const rb = continuesToNext ? (ly + LH - HLP_T) : (ly + asc + HLP_B);
+      ctx.fillStyle = col;
+      ctx.fillRect(rx, rt, rEndX - rx, rb - rt);
+      hi = he + 1;
+    }
+  }
+
+  // PASS 3: Text, censorship, underlines
+  for (let li = 0; li < lineData.length; li++) {
+    const { y: ly, wps } = lineData[li];
+    const ty = ly + asc;
+    ctx.fillStyle = '#1a1a1a';
+    ctx.font = fontStr;
+    for (const wp of wps) {
+      const bold = isBoldTag(wp.tok.tag), italic = isItalicTag(wp.tok.tag);
+      ctx.font = bold && italic ? `italic 700 ${FS}px "${fontName}", Georgia, serif` : bold ? `700 ${FS}px "${fontName}", Georgia, serif` : italic ? `italic 500 ${FS}px "${fontName}", Georgia, serif` : fontStr;
+      ctx.fillText(wp.tok.text, wp.x, ty);
+      if (hasCensor(wp.tok.text)) {
+        ctx.beginPath();
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2.5 * S;
+        const sy = ty - asc * 0.35;
+        ctx.moveTo(wp.x, sy); ctx.lineTo(wp.x + wp.w, sy);
+        ctx.stroke();
+      }
+    }
+    let ui = 0;
+    while (ui < wps.length) {
+      if (!isUnderlineTag(wps[ui].tok.tag)) { ui++; continue; }
+      let ue = ui;
+      while (ue + 1 < wps.length && isUnderlineTag(wps[ue + 1].tok.tag)) ue++;
+      ctx.beginPath();
+      ctx.strokeStyle = '#1a1a1a';
+      ctx.lineWidth = 1.5 * S;
+      ctx.moveTo(wps[ui].x, ty + 3 * S);
+      ctx.lineTo(wps[ue].x + wps[ue].w, ty + 3 * S);
+      ctx.stroke();
+      ui = ue + 1;
+    }
+  }
+}
+
+function parseGeminiResponse(text){const r={hook:"",caption:"",context:"",tupleRaw:""};const hk=text.match(/\*?\*?Hook:?\*?\*?\s*([\s\S]*?)(?=\*?\*?Caption:?\*?\*?)/i);const cp=text.match(/\*?\*?Caption:?\*?\*?\s*([\s\S]*?)(?=\*?\*?Context:?\*?\*?)/i);const cx=text.match(/\*?\*?Context:?\*?\*?\s*([\s\S]*?)(?=\*?\*?Transfer Data:?\*?\*?)/i);const td=text.match(/\*?\*?Transfer Data:?\*?\*?\s*([\s\S]*?)$/i);if(hk)r.hook=hk[1].trim();if(cp)r.caption=cp[1].trim();if(cx)r.context=cx[1].trim();if(td){let raw=td[1].trim().replace(/^```(?:python)?\s*/i,'').replace(/\s*```\s*$/,'');r.tupleRaw=raw.trim()}return r}
+
+// Auto-fix Gemini tuple issues:
+// 1. Split tuples that contain BOTH dialogue and narration
+// 2. Fix _flow tags: dialogue gets _flow, narrative continuation gets plain tag
+function autoFixFlowTags(rawTuple) {
+  const lines = rawTuple.split('\n');
+  const result = [];
+
+  // PASS 0: Split mixed tuples (dialogue + narration in same tuple)
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    const tagMatch = trimmed.match(/,\s*"(\w+)"\s*\)\s*,?\s*$/);
+    if (!trimmed.startsWith('(') || !tagMatch) {
+      result.push(lines[i]);
+      continue;
+    }
+    const tag = tagMatch[1];
+    const baseTag = tag.replace(/_flow|_underline|_bold|_italic/g, '').replace(/^$/, 'narrative');
+    const tagPart = tagMatch[0];
+    const tagStart = trimmed.lastIndexOf(tagPart);
+    let inner = trimmed.substring(1, tagStart).trim();
+
+    // Strip outer string quotes
+    if (inner.startsWith('"') && inner.endsWith('"')) {
+      inner = inner.substring(1, inner.length - 1);
+    }
+
+    // Detect if this tuple has BOTH dialogue marks and narration text outside them
+    // Pattern: narration text followed by ""dialogue"" or ""dialogue"" followed by narration
+    const splitParts = [];
+    let remaining = inner;
+    let hadSplit = false;
+
+    // Repeatedly extract dialogue chunks (""..."") and narration between them
+    while (remaining.length > 0) {
+      // Find next dialogue opening ""
+      const dStart = remaining.indexOf('""');
+      if (dStart === -1) {
+        // Rest is narration
+        if (remaining.trim()) splitParts.push({ text: remaining, isDialogue: false });
+        break;
+      }
+      // Everything before the "" is narration
+      if (dStart > 0) {
+        const narr = remaining.substring(0, dStart);
+        if (narr.trim()) splitParts.push({ text: narr, isDialogue: false });
+      }
+      // Find closing ""
+      const afterOpen = remaining.substring(dStart + 2);
+      const dEnd = afterOpen.indexOf('""');
+      if (dEnd === -1) {
+        // No closing — treat rest as dialogue
+        splitParts.push({ text: remaining.substring(dStart), isDialogue: true });
+        break;
+      }
+      // Extract the dialogue including the "" marks
+      const dialogue = remaining.substring(dStart, dStart + 2 + dEnd + 2);
+      splitParts.push({ text: dialogue, isDialogue: true });
+      remaining = remaining.substring(dStart + 2 + dEnd + 2);
+      if (splitParts.length > 1) hadSplit = true;
+    }
+
+    if (hadSplit && splitParts.length > 1) {
+      // Rebuild as separate tuples
+      for (let p = 0; p < splitParts.length; p++) {
+        const part = splitParts[p];
+        let partTag;
+        if (part.isDialogue) {
+          // Check if next part is narration starting with space (speech tag) → use _flow
+          const nextPart = p + 1 < splitParts.length ? splitParts[p + 1] : null;
+          const nextIsNarr = nextPart && !nextPart.isDialogue;
+          const dialogueEndsWithComma = /,\s*""$/.test(part.text);
+          if (nextIsNarr && dialogueEndsWithComma) {
+            partTag = baseTag === 'narrative' ? 'female_flow' : baseTag + '_flow';
+          } else {
+            partTag = baseTag === 'narrative' ? 'female' : baseTag;
+          }
+        } else {
+          partTag = 'narrative';
+        }
+        const text = part.text;
+        result.push(`  ("${text}", "${partTag}"),`);
+      }
+    } else {
+      result.push(lines[i]);
+    }
+  }
+
+  // PASS 1 & 2: Fix flow tags on the rebuilt lines
+  const tupleLines = [];
+  for (let i = 0; i < result.length; i++) {
+    const trimmed = result[i].trim();
+    const tagMatch = trimmed.match(/,\s*"(\w+)"\s*\)\s*,?\s*$/);
+    if (!trimmed.startsWith('(') || !tagMatch) continue;
+    const tag = tagMatch[1];
+    const hasDialogue = /\(\s*""/.test(trimmed) || /\(\s*"[\u201C]/.test(trimmed);
+    const textStartsWithSpace = /\(\s*" /.test(trimmed);
+    tupleLines.push({idx: i, line: result[i], tag, hasDialogue, textStartsWithSpace, trimmed});
+  }
+
+  // Kill ALL narrative_flow/internal_flow/other_flow → plain tags
+  for (const cur of tupleLines) {
+    if (cur.tag === 'narrative_flow' || cur.tag === 'internal_flow' || cur.tag === 'other_flow') {
+      const bt = cur.tag.replace('_flow', '');
+      cur.line = cur.line.replace('"' + cur.tag + '"', '"' + bt + '"');
+      cur.tag = bt;
+    }
+  }
+
+  // Fix _flow placement: dialogue gets _flow when speech tag follows
+  for (let t = 0; t < tupleLines.length; t++) {
+    const cur = tupleLines[t];
+    const next = t + 1 < tupleLines.length ? tupleLines[t + 1] : null;
+
+    if (!cur.hasDialogue) continue;
+    if (cur.tag.includes('_underline')) continue;
+
+    const baseTag = cur.tag.replace(/_flow/g, '');
+    // Dialogue ending with comma, question mark, or exclamation before closing "" = speech tag may follow
+    const endsBeforeClose = /[,?!]\s*""\s*,\s*"/.test(cur.trimmed) || /[,?!]\u201D"\s*,\s*"/.test(cur.trimmed);
+    const shouldFlow = endsBeforeClose && next &&
+      !next.hasDialogue &&
+      next.textStartsWithSpace &&
+      (next.tag === 'narrative' || next.tag === 'internal' || next.tag === 'other');
+
+    if (shouldFlow && !cur.tag.endsWith('_flow')) {
+      cur.line = cur.line.replace('"' + cur.tag + '"', '"' + baseTag + '_flow"');
+      cur.tag = baseTag + '_flow';
+    } else if (!shouldFlow && cur.tag.endsWith('_flow')) {
+      cur.line = cur.line.replace('"' + cur.tag + '"', '"' + baseTag + '"');
+      cur.tag = baseTag;
+    }
+  }
+
+  for (const tl of tupleLines) {
+    result[tl.idx] = tl.line;
+  }
+  return result.join('\n');
+}
+
+async function extractPDFText(file){if(!window.pdfjsLib){const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';document.head.appendChild(s);await new Promise((r,j)=>{s.onload=r;s.onerror=j});window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'}const pdf=await window.pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;let t='';for(let i=1;i<=pdf.numPages;i++){const pg=await pdf.getPage(i);const tc=await pg.getTextContent();t+=tc.items.map(it=>it.str).join(' ')+'\n'}return t}
+
+const ST={
+  label:{display:"block",fontSize:"10px",textTransform:"uppercase",letterSpacing:"1.5px",color:"#555",marginBottom:"5px",fontFamily:"'DM Mono', monospace"},
+  input:{width:"100%",padding:"10px 12px",backgroundColor:"#111",border:"1px solid #1f1f1f",borderRadius:"6px",color:"#ccc",fontSize:"13px",fontFamily:UI_FONT,outline:"none",boxSizing:"border-box",transition:"border-color 0.2s"},
+  btn:{padding:"10px 16px",border:"none",borderRadius:"6px",fontSize:"13px",fontWeight:600,cursor:"pointer",transition:"all 0.15s ease",fontFamily:UI_FONT},
+  card:{padding:"14px",backgroundColor:"#0f0f0f",borderRadius:"8px",border:"1px solid #1a1a1a"}
+};
+
+const DEFAULT_CAT = {id:"default",name:"General"};
+
+function BookTokApp(){
+  const[activeTab,setActiveTab]=useState("generate");
+  const[step,setStep]=useState("upload");
+  const[apiKey,setApiKey]=useState("");
+  const[model,setModel]=useState("gemini-2.5-flash");
+  const[pdfFile,setPdfFile]=useState(null);
+  const[pdfText,setPdfText]=useState("");
+  const[selectedVibe,setSelectedVibe]=useState("");
+  const[customVibe,setCustomVibe]=useState("");
+  const[loading,setLoading]=useState(false);
+  const[error,setError]=useState("");
+  const[loadingStatus,setLoadingStatus]=useState("");
+  const[hook,setHook]=useState("");
+  const[caption,setCaption]=useState("");
+  const[context,setContext]=useState("");
+  const[tupleRaw,setTupleRaw]=useState("");
+  const[rendered,setRendered]=useState(false);
+  const[author,setAuthor]=useState("");
+  const[copied,setCopied]=useState(false);
+  const[copiedField,setCopiedField]=useState("");
+  const canvasRef=useRef(null);
+  const[fontName,setFontName]=useState("Lora");
+  const[fontSize,setFontSize]=useState(20);
+  const[customFontName,setCustomFontName]=useState("");
+  const fontFileRef=useRef(null);
+  const pdfInputRef=useRef(null);
+  const[photos,setPhotos]=useState([]);
+  const[photosLoading,setPhotosLoading]=useState(true);
+  const[selectedPhotos,setSelectedPhotos]=useState([]);
+  const[aiPickedPhotos,setAiPickedPhotos]=useState([]);
+  const[photoPrompt,setPhotoPrompt]=useState("");
+  const[photoMatching,setPhotoMatching]=useState(false);
+  const[photoMatchError,setPhotoMatchError]=useState("");
+  const photoInputRef=useRef(null);
+  const[uploadProgress,setUploadProgress]=useState("");
+  const[categories,setCategories]=useState([DEFAULT_CAT]);
+  const[activeCatId,setActiveCatId]=useState("default");
+  const[newCatName,setNewCatName]=useState("");
+  const[showNewCat,setShowNewCat]=useState(false);
+  // Book Library
+  const[books,setBooks]=useState([]);
+  const[booksLoading,setBooksLoading]=useState(true);
+  const[selectedBook,setSelectedBook]=useState(null);
+  const[addingBook,setAddingBook]=useState(false);
+  const[newBookTitle,setNewBookTitle]=useState("");
+  const[newBookAuthor,setNewBookAuthor]=useState("");
+  const[newBookProject,setNewBookProject]=useState("RE");
+  const[newBookPdfText,setNewBookPdfText]=useState("");
+  const[newBookPdfName,setNewBookPdfName]=useState("");
+  const[newBookExtracting,setNewBookExtracting]=useState(false);
+  const newBookPdfRef=useRef(null);
+  // Chat drawer
+  const[chatOpen,setChatOpen]=useState(false);
+  const[chatMessages,setChatMessages]=useState([]);
+  const[chatInput,setChatInput]=useState("");
+  const[chatLoading,setChatLoading]=useState(false);
+  const[chatContextMode,setChatContextMode]=useState("excerpt"); // "excerpt" or "full"
+  const chatEndRef=useRef(null);
+  const chatInputRef=useRef(null);
+
+  useEffect(()=>{
+    Promise.all([dbGetAll(),dbGetCats(),dbGetBooks()]).then(([ph,cats,bks])=>{
+      setPhotos(ph);
+      if(cats&&cats.length>0)setCategories(cats);
+      setBooks(bks||[]);
+      setPhotosLoading(false);setBooksLoading(false);
+    }).catch(()=>{setPhotosLoading(false);setBooksLoading(false)});
+  },[]);
+
+  useEffect(()=>{dbSaveCats(categories)},[categories]);
+
+  const activeCatPhotos=photos.filter(p=>p.categoryId===activeCatId);
+  const activeCatName=categories.find(c=>c.id===activeCatId)?.name||"General";
+
+  const loadCustomFont=useCallback(async(files)=>{if(!files||files.length===0)return;try{const fileArr=Array.from(files);// Derive base font name from first file, stripping variant suffixes
+const baseName=fileArr[0].name.replace(/\.\w+$/,'').replace(/[_\-\s]*(bold[_\-\s]*italic|bolditalic|italic|bold|regular)[_\-\s]*/i,'').trim()||fileArr[0].name.replace(/\.\w+$/,'');for(const file of fileArr){const buf=await file.arrayBuffer();const fname=file.name.toLowerCase();let weight='400',style='normal';if(/bold.?italic|bolditalic/i.test(fname)){weight='700';style='italic';}else if(/bold/i.test(fname)){weight='700';style='normal';}else if(/italic/i.test(fname)){weight='400';style='italic';}const f=new FontFace(baseName,buf,{weight,style});await f.load();document.fonts.add(f);}setCustomFontName(baseName);setFontName(baseName);}catch(e){console.error(e)}},[]);
+
+  useEffect(()=>{document.querySelectorAll('link[data-kindle-font]').forEach(el=>el.remove());if(fontName==="DejaVu Serif"){new FontFace("DejaVu Serif",`url(${DEJAVU_CDN})`).load().then(f=>document.fonts.add(f)).catch(()=>{})}else if(fontName!==customFontName){const l=document.createElement('link');l.href=`https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g,'+')}:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap`;l.rel='stylesheet';l.setAttribute('data-kindle-font','true');document.head.appendChild(l)}},[fontName,customFontName]);
+
+  useEffect(()=>{const l=document.createElement('link');l.href='https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap';l.rel='stylesheet';document.head.appendChild(l)},[]);
+
+  // === Book Library Handlers ===
+  const handleNewBookPdf=useCallback(async(file)=>{
+    if(!file||file.type!=='application/pdf')return;
+    setNewBookExtracting(true);setNewBookPdfName(file.name);
+    // Auto-detect title + author from filename
+    const baseName=file.name.replace(/\.pdf$/i,'').replace(/_/g,' ');
+    // Common patterns: "Title - Author", "Author - Title", "Title by Author"
+    let detectedTitle='',detectedAuthor='';
+    const byMatch=baseName.match(/^(.+?)\s+by\s+(.+)$/i);
+    const dashMatch=baseName.match(/^(.+?)\s*[-–—]\s*(.+)$/);
+    if(byMatch){
+      detectedTitle=byMatch[1].trim();detectedAuthor=byMatch[2].trim();
+    } else if(dashMatch){
+      const p1=dashMatch[1].trim(),p2=dashMatch[2].trim();
+      // Check which part is a known author
+      const p1IsAuthor=PROJECT_MAP.some(pr=>pr.authors.some(a=>p1.toLowerCase().includes(a.toLowerCase())));
+      const p2IsAuthor=PROJECT_MAP.some(pr=>pr.authors.some(a=>p2.toLowerCase().includes(a.toLowerCase())));
+      if(p2IsAuthor){detectedTitle=p1;detectedAuthor=p2}
+      else if(p1IsAuthor){detectedTitle=p2;detectedAuthor=p1}
+      else{detectedTitle=p1;detectedAuthor=p2} // default: first part = title
+    } else {
+      detectedTitle=baseName;
+    }
+    if(detectedTitle)setNewBookTitle(detectedTitle);
+    if(detectedAuthor){
+      setNewBookAuthor(detectedAuthor);
+      // Auto-detect project from author
+      const proj=PROJECT_MAP.find(pr=>pr.authors.some(a=>detectedAuthor.toLowerCase().includes(a.toLowerCase())));
+      if(proj)setNewBookProject(proj.initials);
+    }
+    try{const t=await extractPDFText(file);if(!t.trim())throw new Error("No text");setNewBookPdfText(t);setNewBookExtracting(false)}
+    catch(e){setNewBookPdfText("");setNewBookExtracting(false);setError("PDF extract failed: "+e.message)}
+  },[]);
+
+  const addBook=useCallback(async()=>{
+    const title=newBookTitle.trim();const auth=newBookAuthor.trim();
+    if(!title||!auth||!newBookPdfText){setError("Fill in title, author, and upload PDF.");return}
+    const id=`book_${Date.now()}`;
+    const book={id,title,author:auth,project:newBookProject,pdfText:newBookPdfText,pdfName:newBookPdfName,addedAt:Date.now()};
+    await dbPutBook(book);
+    setBooks(prev=>[...prev,book]);
+    setNewBookTitle("");setNewBookAuthor("");setNewBookPdfText("");setNewBookPdfName("");setNewBookExtracting(false);setAddingBook(false);setError("");
+  },[newBookTitle,newBookAuthor,newBookProject,newBookPdfText,newBookPdfName]);
+
+  const deleteBook=useCallback(async(id)=>{
+    await dbDelBook(id);setBooks(prev=>prev.filter(b=>b.id!==id));
+    if(selectedBook&&selectedBook.id===id){setSelectedBook(null);setPdfText("")}
+  },[selectedBook]);
+
+  const selectBook=useCallback((book)=>{
+    setSelectedBook(book);setPdfText(book.pdfText);setAuthor(`${book.title} by ${book.author}`);setStep("upload");setError("");
+  },[]);
+
+  const handlePhotoUpload=useCallback(async(files)=>{
+    const arr=Array.from(files).filter(f=>f.type.startsWith('image/'));
+    if(!arr.length)return;
+    setUploadProgress(`Processing 0/${arr.length}...`);
+    const np=[];
+    for(let i=0;i<arr.length;i++){
+      setUploadProgress(`Processing ${i+1}/${arr.length}...`);
+      const id=`p_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+      const full=await fileToB64(arr[i]);
+      const thumb=await resizeImg(full,200);
+      const photo={id,name:arr[i].name,thumb,full,categoryId:activeCatId};
+      await dbPut(photo);np.push(photo);
+    }
+    setPhotos(prev=>[...prev,...np]);setUploadProgress("");
+  },[activeCatId]);
+
+  const handleDeletePhoto=useCallback(async(id)=>{await dbDel(id);setPhotos(p=>p.filter(x=>x.id!==id));setSelectedPhotos(p=>p.filter(x=>x!==id));setAiPickedPhotos(p=>p.filter(x=>x!==id))},[]);
+
+  const handleClearCategory=useCallback(async()=>{
+    const toDelete=photos.filter(p=>p.categoryId===activeCatId);
+    for(const p of toDelete)await dbDel(p.id);
+    setPhotos(prev=>prev.filter(p=>p.categoryId!==activeCatId));
+    setSelectedPhotos([]);setAiPickedPhotos([]);
+  },[photos,activeCatId]);
+
+  const addCategory=useCallback(()=>{
+    const name=newCatName.trim();if(!name)return;
+    const id=`cat_${Date.now()}`;
+    setCategories(prev=>[...prev,{id,name}]);
+    setActiveCatId(id);setNewCatName("");setShowNewCat(false);
+  },[newCatName]);
+
+  const deleteCategory=useCallback((catId)=>{
+    if(catId==="default")return;
+    setPhotos(prev=>prev.map(p=>p.categoryId===catId?{...p,categoryId:"default"}:p));
+    setCategories(prev=>prev.filter(c=>c.id!==catId));
+    if(activeCatId===catId)setActiveCatId("default");
+  },[activeCatId]);
+
+  const togglePhoto=useCallback((id)=>{setSelectedPhotos(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id])},[]);
+
+  const matchPhotos=useCallback(async()=>{
+    if(!apiKey.trim()){setPhotoMatchError("Enter your Gemini API key on the Generate tab first.");return}
+    if(!activeCatPhotos.length){setPhotoMatchError("No photos in this category.");return}
+    if(!hook&&!context&&!tupleRaw){setPhotoMatchError("Generate an excerpt first.");return}
+    setPhotoMatching(true);setPhotoMatchError("");setAiPickedPhotos([]);
+    const excerptText=tupleRaw?parseTupleData(tupleRaw).map(e=>e.text).join(' '):'';
+    const instruction=photoPrompt.trim()||"Pick the 1-2 best photos that match the mood and scene.";
+    const imgParts=activeCatPhotos.map((p,i)=>[{inlineData:{mimeType:"image/jpeg",data:p.thumb.split(',')[1]}},{text:`[Photo ${i}: "${p.name}"]`}]).flat();
+    const prompt=`You are selecting photos for a BookTok post.\n\nExcerpt context:\n- Hook: ${hook}\n- Scene: ${context}\n- Excerpt: ${excerptText}\n- Vibe: ${selectedVibe||customVibe||"romantic"}\n\nUser instruction: "${instruction}"\n\nI'm showing you ${activeCatPhotos.length} photos labeled [Photo N]. Select the best match(es).\n\nRESPOND WITH ONLY a JSON array of photo numbers. Example: [2, 5]`;
+    try{
+      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{parts:[...imgParts,{text:prompt}]}],generationConfig:{temperature:0.3,maxOutputTokens:256}})});
+      if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`API ${res.status}`)}
+      const data=await res.json();const txt=(data?.candidates?.[0]?.content?.parts?.[0]?.text||"").replace(/```(?:json)?\s*/gi,'').replace(/```/g,'').trim();
+      const indices=JSON.parse(txt);if(Array.isArray(indices)){const ids=indices.filter(i=>i>=0&&i<activeCatPhotos.length).map(i=>activeCatPhotos[i].id);setAiPickedPhotos(ids);setSelectedPhotos(ids)}
+    }catch(e){setPhotoMatchError("Matching failed: "+e.message)}
+    setPhotoMatching(false);
+  },[apiKey,model,activeCatPhotos,hook,context,tupleRaw,selectedVibe,customVibe,photoPrompt]);
+
+  const handlePDF=useCallback(async(file)=>{if(!file||file.type!=='application/pdf'){setError("Please upload a PDF file.");return}setPdfFile(file);setError("");setLoadingStatus("Extracting text...");setLoading(true);try{const t=await extractPDFText(file);if(!t.trim())throw new Error("No text found");setPdfText(t);setLoading(false);setLoadingStatus("")}catch(e){setError("Extract failed: "+e.message);setLoading(false);setLoadingStatus("")}},[]);
+
+  const callGemini=useCallback(async()=>{
+    if(!apiKey.trim()){setError("Please enter your Gemini API key.");return}
+    if(!pdfText.trim()){setError("No book selected or PDF text extracted.");return}
+    const vibe=customVibe.trim()||selectedVibe;if(!vibe){setError("Please select or enter a vibe.");return}
+    setError("");setLoading(true);setLoadingStatus("Sending to Gemini...");
+    const truncated=pdfText.length>300000?pdfText.substring(0,300000):pdfText;
+    try{setLoadingStatus("Waiting for response...");
+      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{parts:[{text:`${GEMINI_SYSTEM_PROMPT}\n\nVibe/Trope to find: ${vibe}\n\nBook text:\n${truncated}`}]}],generationConfig:{temperature:0.9,maxOutputTokens:8192}})});
+      if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`API ${res.status}`)}
+      const data=await res.json();const text=data?.candidates?.[0]?.content?.parts?.[0]?.text;if(!text)throw new Error("Empty response");
+      const parsed=parseGeminiResponse(text);const fixedTuple=parsed.tupleRaw?autoFixFlowTags(parsed.tupleRaw):parsed.tupleRaw;setHook(parsed.hook);setCaption(parsed.caption);setContext(parsed.context);setTupleRaw(fixedTuple);
+      const bm=parsed.caption.match(/\uD83D\uDCDA\s*:?\s*(.+?)(?:\n|$)/);if(bm)setAuthor(bm[1].trim());else if(selectedBook)setAuthor(`${selectedBook.title} by ${selectedBook.author}`);
+      setStep("results");setActiveTab("results");setLoading(false);setLoadingStatus("");
+      if(fixedTuple)setTimeout(()=>autoRender(fixedTuple),300);
+    }catch(e){setError("Gemini error: "+e.message);setLoading(false);setLoadingStatus("")}
+  },[apiKey,model,pdfText,selectedVibe,customVibe,selectedBook]);
+
+  const autoRender=useCallback((raw)=>{const entries=parseTupleData(raw||tupleRaw);if(!entries.length)return;document.fonts.load(`500 ${fontSize}px "${fontName}"`).then(()=>{if(canvasRef.current){renderKindle(canvasRef.current,buildGroups(entries),2,fontName,fontSize);setRendered(true)}})},[tupleRaw,fontName,fontSize]);
+  const doRender=useCallback(()=>{const entries=parseTupleData(tupleRaw);if(!entries.length){setError("No valid tuple data.");return}document.fonts.load(`500 ${fontSize}px "${fontName}"`).then(()=>{renderKindle(canvasRef.current,buildGroups(entries),2,fontName,fontSize);setRendered(true)})},[tupleRaw,fontName,fontSize]);
+  const doCopy=useCallback(async()=>{try{const blob=await new Promise(r=>canvasRef.current.toBlob(r,'image/png'));await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);setCopied(true);setTimeout(()=>setCopied(false),2000)}catch(e){console.error(e)}},[]);
+  const copyField=useCallback(async(text,field)=>{try{await navigator.clipboard.writeText(text);setCopiedField(field);setTimeout(()=>setCopiedField(""),1500)}catch(e){console.error(e)}},[]);
+  const resetAll=useCallback(()=>{setStep("upload");setActiveTab("generate");setPdfFile(null);setPdfText("");setSelectedVibe("");setCustomVibe("");setHook("");setCaption("");setContext("");setTupleRaw("");setRendered(false);setAuthor("");setError("");setSelectedPhotos([]);setAiPickedPhotos([]);setSelectedBook(null);setChatMessages([]);setChatOpen(false)},[]);
+
+  // Auto-scroll chat to bottom
+  useEffect(()=>{if(chatEndRef.current)chatEndRef.current.scrollIntoView({behavior:"smooth"})},[chatMessages,chatLoading]);
+
+  const sendChat=useCallback(async()=>{
+    const msg=chatInput.trim();
+    if(!msg||!apiKey.trim())return;
+    setChatInput("");
+    const userMsg={role:"user",text:msg,ts:Date.now()};
+    setChatMessages(prev=>[...prev,userMsg]);
+    setChatLoading(true);
+
+    // Build context based on mode
+    const excerptText=tupleRaw?parseTupleData(tupleRaw).map(e=>e.text).join(''):'';
+    let systemCtx;
+    if(chatContextMode==="full"&&pdfText){
+      const truncBook=pdfText.length>200000?pdfText.substring(0,200000):pdfText;
+      systemCtx=`You are a helpful assistant for a BookTok content creator. You have access to the full book text and the current excerpt they're working with.\n\nBook: ${author||"Unknown"}\nVibe: ${selectedVibe||customVibe||"N/A"}\n\nCurrent excerpt:\n${excerptText}\n\nHook: ${hook}\nContext: ${context}\n\nFull book text:\n${truncBook}`;
+    } else {
+      systemCtx=`You are a helpful assistant for a BookTok content creator. You have the current excerpt and scene context they're working with.\n\nBook: ${author||"Unknown"}\nVibe: ${selectedVibe||customVibe||"N/A"}\n\nCurrent excerpt:\n${excerptText}\n\nHook: ${hook}\nCaption: ${caption}\nContext: ${context}`;
+    }
+
+    // Build conversation history for multi-turn
+    const historyParts=[];
+    historyParts.push({text:systemCtx});
+    for(const m of chatMessages){
+      historyParts.push({text:(m.role==="user"?"User: ":"Assistant: ")+m.text});
+    }
+    historyParts.push({text:"User: "+msg});
+
+    try{
+      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`,{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({contents:[{parts:historyParts}],generationConfig:{temperature:0.7,maxOutputTokens:4096}})
+      });
+      if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`API ${res.status}`)}
+      const data=await res.json();
+      const reply=data?.candidates?.[0]?.content?.parts?.[0]?.text||"No response.";
+      setChatMessages(prev=>[...prev,{role:"assistant",text:reply,ts:Date.now()}]);
+    }catch(e){
+      setChatMessages(prev=>[...prev,{role:"assistant",text:"Error: "+e.message,ts:Date.now(),isError:true}]);
+    }
+    setChatLoading(false);
+  },[chatInput,apiKey,model,chatMessages,chatContextMode,pdfText,tupleRaw,author,selectedVibe,customVibe,hook,caption,context]);
+
+  const tabStyle=(t)=>({padding:"8px 18px",fontSize:"12px",fontWeight:600,cursor:"pointer",border:"none",borderBottom:activeTab===t?"2px solid #fff":"2px solid transparent",backgroundColor:"transparent",color:activeTab===t?"#ddd":"#555",fontFamily:UI_FONT,transition:"all 0.15s",letterSpacing:"0.3px"});
+  const catTabStyle=(id)=>({padding:"6px 14px",fontSize:"12px",fontWeight:500,cursor:"pointer",border:"1px solid",borderColor:activeCatId===id?"#555":"#1a1a1a",borderRadius:"20px",backgroundColor:activeCatId===id?"#1e1e1e":"transparent",color:activeCatId===id?"#ddd":"#555",fontFamily:UI_FONT,transition:"all 0.15s",whiteSpace:"nowrap"});
+  const CopyBtn=({field,text})=>(<button onClick={()=>copyField(text,field)} style={{...ST.btn,padding:"3px 10px",fontSize:"10px",backgroundColor:"transparent",color:copiedField===field?"#5cb85c":"#555",border:`1px solid ${copiedField===field?"#2a5a2a":"#222"}`}}>{copiedField===field?"✓ Copied":"Copy"}</button>);
+
+  return (
+    <div style={{minHeight:"100vh",backgroundColor:"#0b0b0b",color:"#ddd",fontFamily:UI_FONT}}>
+
+      {/* Header */}
+      <div style={{borderBottom:"1px solid #161616",padding:"12px 24px",display:"flex",alignItems:"center",justifyContent:"space-between",background:"linear-gradient(180deg,#0f0f0f 0%,#0b0b0b 100%)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
+          <span style={{fontSize:"20px"}}>📖</span>
+          <span style={{fontSize:"16px",fontWeight:700,letterSpacing:"-0.3px"}}>BookTok Studio</span>
+          <span style={{fontSize:"9px",padding:"2px 7px",borderRadius:"3px",backgroundColor:"#1a1a1a",color:"#555",fontFamily:"'DM Mono',monospace",border:"1px solid #222",letterSpacing:"0.5px"}}>v4.2</span>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
+          {step==="results"&&<button onClick={resetAll} style={{...ST.btn,backgroundColor:"transparent",color:"#555",border:"1px solid #222",fontSize:"11px",padding:"6px 12px"}}>← New Book</button>}
+          {step!=="results"&&<button onClick={()=>{setStep("results");setActiveTab("results")}} style={{...ST.btn,backgroundColor:"transparent",color:"#333",border:"1px solid #1a1a1a",fontSize:"11px",padding:"6px 12px"}}>Skip to Results ↗</button>}
+          <span style={{fontSize:"10px",color:"#333",fontFamily:"'DM Mono',monospace"}}>gemini-powered</span>
+        </div>
+      </div>
+
+      {/* Nav */}
+      <div style={{borderBottom:"1px solid #161616",padding:"0 24px",display:"flex",gap:"4px"}}>
+        <button style={tabStyle("generate")} onClick={()=>setActiveTab("generate")}>Generate</button>
+        <button style={tabStyle("photos")} onClick={()=>setActiveTab("photos")}>
+          Photo Library{photos.length>0&&<span style={{marginLeft:"6px",fontSize:"9px",backgroundColor:"#1a1a1a",padding:"1px 6px",borderRadius:"8px",color:"#666"}}>{photos.length}</span>}
+        </button>
+        {step==="results"&&<button style={tabStyle("results")} onClick={()=>setActiveTab("results")}>Results</button>}
+      </div>
+
+      {/* GENERATE TAB */}
+      {activeTab==="generate"&&(
+        <div style={{maxWidth:"720px",margin:"0 auto",padding:"32px 24px"}}>
+          {/* API Key & Model row */}
+          <div style={{display:"flex",gap:"14px",marginBottom:"28px"}}>
+            <div style={{flex:1}}>
+              <label style={ST.label}>Gemini API Key</label>
+              <input type="password" value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="Paste your Gemini API key" style={{...ST.input,fontFamily:"'DM Mono',monospace",fontSize:"12px"}} />
+            </div>
+            <div style={{width:"200px"}}>
+              <label style={ST.label}>Model</label>
+              <select value={model} onChange={e=>setModel(e.target.value)} style={{...ST.input,cursor:"pointer",appearance:"auto",fontFamily:"'DM Mono',monospace",fontSize:"12px"}}>
+                {GEMINI_MODELS.map(m=><option key={m.id} value={m.id}>{m.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Book Library */}
+          <div style={{marginBottom:"28px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}}>
+              <label style={{...ST.label,marginBottom:0}}>Select Book</label>
+              <button onClick={()=>{setAddingBook(!addingBook);setError("");setNewBookTitle("");setNewBookAuthor("");setNewBookPdfText("");setNewBookPdfName("")}} style={{...ST.btn,padding:"5px 12px",fontSize:"10px",backgroundColor:addingBook?"#1a1a1a":"transparent",color:addingBook?"#ddd":"#555",border:"1px solid #222"}}>{addingBook?"Cancel":"+ Add Book"}</button>
+            </div>
+
+            {/* Add Book Form — PDF first, then auto-filled fields */}
+            {addingBook&&(
+              <div style={{...ST.card,marginBottom:"14px",display:"flex",flexDirection:"column",gap:"10px"}}>
+                <div>
+                  <label style={ST.label}>Upload PDF <span style={{textTransform:"none",color:"#444"}}>(auto-detects title & author from filename)</span></label>
+                  <input ref={newBookPdfRef} type="file" accept=".pdf" style={{display:"none"}} onChange={e=>handleNewBookPdf(e.target.files[0])} />
+                  <div onClick={()=>newBookPdfRef.current?.click()} onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor='#333'}} onDragLeave={e=>{e.currentTarget.style.borderColor='#1f1f1f'}} onDrop={e=>{e.preventDefault();e.currentTarget.style.borderColor='#1f1f1f';handleNewBookPdf(e.dataTransfer.files[0])}} style={{...ST.card,cursor:"pointer",textAlign:"center",padding:"20px",border:"1px dashed #1f1f1f",transition:"border-color 0.2s"}}>
+                    {newBookExtracting?(<div style={{color:"#888",fontSize:"12px"}}>Extracting text from {newBookPdfName}...</div>):newBookPdfText?(<div><span style={{color:"#8b8",fontSize:"12px"}}>✓ {newBookPdfName}</span><span style={{color:"#333",fontSize:"11px",marginLeft:"8px",fontFamily:"'DM Mono',monospace"}}>{(newBookPdfText.length/1000).toFixed(0)}k chars</span></div>):(<div style={{color:"#444",fontSize:"12px"}}>Drop PDF here or click to browse</div>)}
+                  </div>
+                </div>
+                {(newBookPdfText||newBookTitle)&&(
+                  <div style={{display:"flex",gap:"10px"}}>
+                    <div style={{flex:1}}><label style={ST.label}>Book Title</label><input value={newBookTitle} onChange={e=>setNewBookTitle(e.target.value)} placeholder="e.g. Dark Billionaire Stalker" style={{...ST.input,fontSize:"12px"}} /></div>
+                    <div style={{flex:1}}><label style={ST.label}>Author</label><input value={newBookAuthor} onChange={e=>{setNewBookAuthor(e.target.value);const proj=PROJECT_MAP.find(pr=>pr.authors.some(a=>e.target.value.toLowerCase().includes(a.toLowerCase())));if(proj)setNewBookProject(proj.initials)}} placeholder="e.g. Lara Hart" style={{...ST.input,fontSize:"12px"}} /></div>
+                  </div>
+                )}
+                {(newBookPdfText||newBookTitle)&&(
+                  <div style={{display:"flex",gap:"10px",alignItems:"flex-end"}}>
+                    <div>
+                      <label style={ST.label}>Project</label>
+                      <div style={{display:"flex",gap:"6px"}}>
+                        {["RE","DK","PV"].map(p=>(<button key={p} onClick={()=>setNewBookProject(p)} style={{padding:"6px 14px",borderRadius:"4px",fontSize:"11px",fontWeight:600,fontFamily:"'DM Mono',monospace",border:"1px solid",cursor:"pointer",borderColor:newBookProject===p?(p==="RE"?"#4a2525":p==="DK"?"#25354a":"#254a25"):"#1a1a1a",backgroundColor:newBookProject===p?(p==="RE"?"#2a1515":p==="DK"?"#1f2a3d":"#152a15"):"transparent",color:newBookProject===p?(p==="RE"?"#f0a5a5":p==="DK"?"#a5c4f0":"#a5f0a5"):"#555"}}>{p}</button>))}
+                      </div>
+                    </div>
+                    <div style={{flex:1}} />
+                    <button onClick={addBook} disabled={!newBookTitle.trim()||!newBookAuthor.trim()||!newBookPdfText} style={{...ST.btn,padding:"10px 20px",backgroundColor:(!newBookTitle.trim()||!newBookAuthor.trim()||!newBookPdfText)?"#151515":"#fff",color:(!newBookTitle.trim()||!newBookAuthor.trim()||!newBookPdfText)?"#444":"#000",fontSize:"12px",whiteSpace:"nowrap"}}>Add to Library</button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Book dropdowns by project */}
+            <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
+              {["RE","DK","PV"].map(proj=>{
+                const projBooks=books.filter(b=>b.project===proj);
+                const projColor=proj==="RE"?"#f0a5a5":proj==="DK"?"#a5c4f0":"#a5f0a5";
+                const projBg=proj==="RE"?"#2a1515":proj==="DK"?"#1f2a3d":"#152a15";
+                const projBorder=proj==="RE"?"#4a2525":proj==="DK"?"#25354a":"#254a25";
+                const selId=selectedBook&&selectedBook.project===proj?selectedBook.id:"";
+                return (
+                  <div key={proj} style={{display:"flex",alignItems:"center",gap:"10px"}}>
+                    <span style={{fontSize:"10px",fontWeight:700,letterSpacing:"1.5px",padding:"3px 8px",borderRadius:"3px",backgroundColor:projBg,color:projColor,fontFamily:"'DM Mono',monospace",border:`1px solid ${projBorder}`,minWidth:"32px",textAlign:"center"}}>{proj}</span>
+                    <select value={selId} onChange={e=>{const book=books.find(b=>b.id===e.target.value);if(book)selectBook(book);else if(!e.target.value){setSelectedBook(null);setPdfText("")}}} style={{...ST.input,flex:1,cursor:"pointer",appearance:"auto",fontSize:"12px",color:selId?"#ddd":"#555"}}>
+                      <option value="">— Select a book —</option>
+                      {projBooks.map(b=>(<option key={b.id} value={b.id}>{b.title} — {b.author}</option>))}
+                    </select>
+                    {selId&&<button onClick={()=>{if(confirm(`Delete "${selectedBook.title}"?`))deleteBook(selectedBook.id)}} title="Delete this book" style={{background:"none",border:"1px solid #1a1a1a",borderRadius:"4px",color:"#444",cursor:"pointer",fontSize:"13px",padding:"6px 10px",lineHeight:1,transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.color='#e55';e.currentTarget.style.borderColor='#4a2525'}} onMouseLeave={e=>{e.currentTarget.style.color='#444';e.currentTarget.style.borderColor='#1a1a1a'}}>×</button>}
+                  </div>
+                );
+              })}
+            </div>
+            {books.length===0&&!addingBook&&(
+              <div style={{textAlign:"center",padding:"16px",color:"#333",fontSize:"12px",fontFamily:"'DM Mono',monospace",marginTop:"8px"}}>Click "+ Add Book" to build your library</div>
+            )}
+          </div>
+
+          {/* Vibe / Trope Selection */}
+          <div style={{marginBottom:"28px",opacity:selectedBook?1:0.4,pointerEvents:selectedBook?"auto":"none",transition:"opacity 0.2s"}}>
+            <label style={ST.label}>Select Vibe / Trope</label>
+            <div style={{display:"flex",flexWrap:"wrap",gap:"6px",marginBottom:"10px"}}>
+              {VIBES.map(v=>(<button key={v} onClick={()=>{setSelectedVibe(v);setCustomVibe("")}} style={{padding:"7px 13px",borderRadius:"20px",fontSize:"12px",border:selectedVibe===v?"1px solid #444":"1px solid #1a1a1a",backgroundColor:selectedVibe===v?"#1a1a1a":"#0f0f0f",color:selectedVibe===v?"#ddd":"#666",cursor:"pointer",transition:"all 0.15s",fontFamily:UI_FONT}}>{v}</button>))}
+            </div>
+            <input value={customVibe} onChange={e=>{setCustomVibe(e.target.value);if(e.target.value)setSelectedVibe("")}} placeholder="Or type a custom vibe..." style={{...ST.input,fontSize:"12px"}} />
+          </div>
+
+          {error&&<div style={{padding:"10px 14px",backgroundColor:"#1a0f0f",border:"1px solid #331a1a",borderRadius:"6px",color:"#e55",fontSize:"12px",marginBottom:"16px",fontFamily:"'DM Mono',monospace"}}>{error}</div>}
+          <button onClick={callGemini} disabled={loading||!selectedBook||!pdfText||(!selectedVibe&&!customVibe.trim())} style={{...ST.btn,width:"100%",padding:"14px",backgroundColor:loading||!selectedBook||!pdfText||(!selectedVibe&&!customVibe.trim())?"#151515":"#fff",color:loading||!selectedBook||!pdfText||(!selectedVibe&&!customVibe.trim())?"#444":"#000",fontSize:"14px"}}>
+            {loading?(<span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}><span style={{display:"inline-block",width:"14px",height:"14px",border:"2px solid #333",borderTopColor:"#888",borderRadius:"50%",animation:"spin 0.8s linear infinite"}} />{loadingStatus}</span>):"Generate BookTok Assets"}
+          </button>
+        </div>
+      )}
+
+      {/* PHOTO LIBRARY TAB */}
+      {activeTab==="photos"&&(
+        <div style={{maxWidth:"960px",margin:"0 auto",padding:"28px 24px"}}>
+
+          {/* Category Tab Bar */}
+          <div style={{marginBottom:"20px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:"8px",flexWrap:"wrap",marginBottom:"14px"}}>
+              {[...categories].sort((a,b)=>a.id==="default"?-1:b.id==="default"?1:0).map(cat=>(
+                <div key={cat.id} style={{display:"flex",alignItems:"center",gap:"3px"}}>
+                  <button style={catTabStyle(cat.id)} onClick={()=>setActiveCatId(cat.id)}>{cat.name}</button>
+                  {cat.id!=="default"&&(
+                    <button onClick={()=>deleteCategory(cat.id)} title="Delete category" style={{background:"none",border:"none",color:"#333",cursor:"pointer",fontSize:"13px",padding:"0 2px",lineHeight:1}} onMouseEnter={e=>e.currentTarget.style.color='#e55'} onMouseLeave={e=>e.currentTarget.style.color='#333'}>×</button>
+                  )}
+                </div>
+              ))}
+              {showNewCat?(
+                <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
+                  <input autoFocus value={newCatName} onChange={e=>setNewCatName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")addCategory();if(e.key==="Escape")setShowNewCat(false)}} placeholder="Category name..." style={{...ST.input,width:"150px",padding:"5px 10px",fontSize:"12px"}} />
+                  <button onClick={addCategory} style={{...ST.btn,padding:"5px 12px",fontSize:"11px",backgroundColor:"#fff",color:"#000"}}>Add</button>
+                  <button onClick={()=>setShowNewCat(false)} style={{...ST.btn,padding:"5px 10px",fontSize:"11px",backgroundColor:"transparent",color:"#555",border:"1px solid #222"}}>Cancel</button>
+                </div>
+              ):(
+                <button onClick={()=>setShowNewCat(true)} style={{...catTabStyle("__new"),borderStyle:"dashed",color:"#444"}}>+ New Category</button>
+              )}
+            </div>
+
+            {/* Upload zone */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+              <label style={{...ST.label,marginBottom:0}}>
+                {activeCatName} <span style={{textTransform:"none",color:"#333",marginLeft:"4px"}}>— persists between sessions</span>
+              </label>
+              {activeCatPhotos.length>0&&<button onClick={handleClearCategory} style={{...ST.btn,padding:"4px 10px",fontSize:"10px",backgroundColor:"transparent",color:"#553333",border:"1px solid #331a1a"}}>Clear Category</button>}
+            </div>
+            <input ref={photoInputRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>handlePhotoUpload(e.target.files)} />
+            <div onClick={()=>photoInputRef.current?.click()} onDragOver={e=>{e.preventDefault();e.stopPropagation();e.currentTarget.style.borderColor='#444'}} onDragLeave={e=>{e.currentTarget.style.borderColor='#1f1f1f'}} onDrop={e=>{e.preventDefault();e.stopPropagation();e.currentTarget.style.borderColor='#1f1f1f';handlePhotoUpload(e.dataTransfer.files)}} style={{...ST.card,cursor:"pointer",textAlign:"center",padding:"22px 20px",border:"1px dashed #1f1f1f",transition:"border-color 0.2s",marginBottom:"6px"}}>
+              <div style={{fontSize:"20px",marginBottom:"4px",opacity:0.35}}>🖼️</div>
+              <div style={{color:"#555",fontSize:"13px"}}>Drop photos here or click to browse</div>
+              <div style={{color:"#333",fontSize:"11px",marginTop:"3px",fontFamily:"'DM Mono',monospace"}}>Uploading to: <strong style={{color:"#666"}}>{activeCatName}</strong> · JPG, PNG, WebP</div>
+            </div>
+            {uploadProgress&&<div style={{fontSize:"11px",color:"#888",fontFamily:"'DM Mono',monospace",marginBottom:"8px"}}>{uploadProgress}</div>}
+          </div>
+
+          {/* AI Photo Matching */}
+          {activeCatPhotos.length>0&&step==="results"&&(
+            <div style={{...ST.card,marginBottom:"20px"}}>
+              <label style={{...ST.label,marginBottom:"8px"}}>AI Photo Matching — searching in <strong style={{color:"#777",textTransform:"none",letterSpacing:0}}>{activeCatName}</strong></label>
+              <div style={{display:"flex",gap:"8px",marginBottom:"8px"}}>
+                <input value={photoPrompt} onChange={e=>setPhotoPrompt(e.target.value)} placeholder='e.g. "2 photos" or "1 photo of man and 1 of woman"' style={{...ST.input,flex:1,fontSize:"12px"}} />
+                <button onClick={matchPhotos} disabled={photoMatching} style={{...ST.btn,backgroundColor:photoMatching?"#151515":"#fff",color:photoMatching?"#444":"#000",whiteSpace:"nowrap",minWidth:"120px"}}>
+                  {photoMatching?(<span style={{display:"flex",alignItems:"center",gap:"6px"}}><span style={{display:"inline-block",width:"12px",height:"12px",border:"2px solid #333",borderTopColor:"#888",borderRadius:"50%",animation:"spin 0.8s linear infinite"}} />Matching...</span>):"Match Photos"}
+                </button>
+              </div>
+              {photoMatchError&&<div style={{fontSize:"11px",color:"#e55",fontFamily:"'DM Mono',monospace"}}>{photoMatchError}</div>}
+              {aiPickedPhotos.length>0&&<div style={{fontSize:"11px",color:"#8b8",fontFamily:"'DM Mono',monospace",marginTop:"4px"}}>✓ Gemini selected {aiPickedPhotos.length} photo{aiPickedPhotos.length!==1?'s':''} — click any to change</div>}
+            </div>
+          )}
+          {activeCatPhotos.length>0&&step!=="results"&&(
+            <div style={{...ST.card,marginBottom:"20px",borderColor:"#1a1a0f"}}>
+              <div style={{fontSize:"11px",color:"#666",fontFamily:"'DM Mono',monospace"}}>💡 Generate an excerpt first, then come back to use AI photo matching</div>
+            </div>
+          )}
+
+          {/* Photo Grid */}
+          {photosLoading?(
+            <div style={{textAlign:"center",color:"#444",padding:"40px",fontFamily:"'DM Mono',monospace",fontSize:"12px"}}>Loading library...</div>
+          ):activeCatPhotos.length===0?(
+            <div style={{textAlign:"center",color:"#333",padding:"60px 20px"}}>
+              <div style={{fontSize:"36px",marginBottom:"12px",opacity:0.2}}>🖼️</div>
+              <div style={{fontSize:"13px",color:"#444"}}>No photos in {activeCatName} yet</div>
+              <div style={{fontSize:"11px",color:"#333",marginTop:"6px",fontFamily:"'DM Mono',monospace"}}>Drop photos above to get started</div>
+            </div>
+          ):(
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))",gap:"10px"}}>
+              {activeCatPhotos.map(p=>{
+                const isSel=selectedPhotos.includes(p.id);const isAi=aiPickedPhotos.includes(p.id);
+                return(
+                  <div key={p.id} onClick={()=>togglePhoto(p.id)} style={{position:"relative",borderRadius:"6px",overflow:"hidden",cursor:"pointer",transition:"all 0.15s",border:isSel?(isAi?"2px solid #8b8":"2px solid #fff"):"2px solid #1a1a1a",opacity:selectedPhotos.length>0&&!isSel?0.5:1,transform:isSel?"scale(1.02)":"scale(1)"}}>
+                    <img src={p.thumb} alt={p.name} style={{width:"100%",aspectRatio:"1",objectFit:"cover",display:"block"}} />
+                    {isSel&&<div style={{position:"absolute",top:"6px",left:"6px",width:"20px",height:"20px",borderRadius:"50%",backgroundColor:isAi?"#8b8":"#fff",color:"#000",fontSize:"12px",fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>✓</div>}
+                    {isAi&&<div style={{position:"absolute",top:"6px",right:"6px",padding:"2px 6px",borderRadius:"3px",backgroundColor:"rgba(0,0,0,0.75)",color:"#8b8",fontSize:"9px",fontFamily:"'DM Mono',monospace",fontWeight:500}}>AI</div>}
+                    <button
+                      onClick={e=>{e.stopPropagation();e.preventDefault();handleDeletePhoto(p.id)}}
+                      title="Delete photo"
+                      style={{position:"absolute",bottom:"4px",right:"4px",width:"26px",height:"26px",borderRadius:"50%",backgroundColor:"rgba(0,0,0,0.85)",border:"1px solid #444",color:"#888",fontSize:"15px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,zIndex:10}}
+                      onMouseEnter={e=>{e.currentTarget.style.color='#ff5555';e.currentTarget.style.borderColor='#ff5555'}}
+                      onMouseLeave={e=>{e.currentTarget.style.color='#888';e.currentTarget.style.borderColor='#444'}}
+                    >×</button>
+                    <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"16px 6px 4px",fontSize:"9px",color:"#aaa",background:"linear-gradient(transparent,rgba(0,0,0,0.8))",fontFamily:"'DM Mono',monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {selectedPhotos.length>0&&(
+            <div style={{marginTop:"16px",padding:"10px 14px",backgroundColor:"#0f0f0f",borderRadius:"6px",border:"1px solid #1a1a1a",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:"12px",color:"#888"}}>{selectedPhotos.length} photo{selectedPhotos.length!==1?'s':''} selected</span>
+              <button onClick={()=>{setSelectedPhotos([]);setAiPickedPhotos([])}} style={{...ST.btn,padding:"4px 12px",fontSize:"11px",backgroundColor:"transparent",color:"#555",border:"1px solid #222"}}>Clear Selection</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* RESULTS TAB */}
+      {activeTab==="results"&&step==="results"&&(
+        <div style={{display:"flex",minHeight:"calc(100vh - 90px)",paddingBottom:"60px"}}>
+          <div style={{width:"430px",minWidth:"390px",padding:"18px",borderRight:"1px solid #161616",overflowY:"auto",display:"flex",flexDirection:"column",gap:"14px"}}>
+            {getProject(author)&&<div style={{display:"flex",alignItems:"center",gap:"8px",padding:"8px 12px",backgroundColor:"#111",borderRadius:"6px",border:"1px solid #1a1a1a"}}><span style={{fontSize:"10px",fontWeight:700,letterSpacing:"1.5px",padding:"3px 8px",borderRadius:"4px",backgroundColor:getProject(author)==="RE"?"#2a1515":getProject(author)==="DK"?"#1f2a3d":"#152a15",color:getProject(author)==="RE"?"#f0a5a5":getProject(author)==="DK"?"#a5c4f0":"#a5f0a5",fontFamily:"'DM Mono',monospace"}}>{getProject(author)}</span><span style={{fontSize:"11px",color:"#555",fontFamily:"'DM Mono',monospace"}}>Tasks {getProject(author)}</span></div>}
+            <div style={ST.card}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}><label style={{...ST.label,marginBottom:0}}>Hook (Slide 1)</label><CopyBtn field="hook" text={hook} /></div>
+              <textarea value={hook} onChange={e=>setHook(e.target.value)} style={{...ST.input,height:"60px",resize:"vertical",fontSize:"14px",fontWeight:600,color:"#eee"}} />
+            </div>
+            <div style={ST.card}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}><label style={{...ST.label,marginBottom:0}}>Caption</label><CopyBtn field="caption" text={caption} /></div>
+              <textarea value={caption} onChange={e=>setCaption(e.target.value)} style={{...ST.input,height:"110px",resize:"vertical",fontSize:"12px",lineHeight:"1.6"}} />
+            </div>
+            <div style={ST.card}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}><label style={{...ST.label,marginBottom:0}}>Context</label><CopyBtn field="context" text={context} /></div>
+              <textarea value={context} onChange={e=>setContext(e.target.value)} style={{...ST.input,height:"130px",resize:"vertical",fontSize:"12px",lineHeight:"1.6"}} />
+            </div>
+
+            {selectedPhotos.length>0&&(
+              <div style={ST.card}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+                  <label style={{...ST.label,marginBottom:0}}>Selected Photos</label>
+                  <button onClick={()=>setActiveTab("photos")} style={{...ST.btn,padding:"3px 8px",fontSize:"10px",backgroundColor:"transparent",color:"#555",border:"1px solid #222"}}>Edit</button>
+                </div>
+                <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
+                  {selectedPhotos.map(id=>{const p=photos.find(ph=>ph.id===id);if(!p)return null;return(<div key={id} style={{position:"relative",display:"inline-block"}}>
+                    <img src={p.full||p.thumb} alt={p.name} style={{width:"70px",height:"70px",objectFit:"cover",borderRadius:"4px",border:"1px solid #222",display:"block"}} />
+                    {aiPickedPhotos.includes(id)&&<div style={{position:"absolute",top:"2px",left:"2px",padding:"1px 4px",borderRadius:"2px",backgroundColor:"rgba(0,0,0,0.7)",color:"#8b8",fontSize:"8px",fontFamily:"'DM Mono',monospace"}}>AI</div>}
+                    <button onClick={async(e)=>{e.stopPropagation();try{const img=new Image();img.crossOrigin="anonymous";img.onload=async()=>{const c=document.createElement("canvas");c.width=img.naturalWidth;c.height=img.naturalHeight;c.getContext("2d").drawImage(img,0,0);const blob=await new Promise(r=>c.toBlob(r,"image/png"));await navigator.clipboard.write([new ClipboardItem({"image/png":blob})]);e.currentTarget.textContent="✓";setTimeout(()=>{if(e.currentTarget)e.currentTarget.textContent="⎘"},1500)};img.src=p.full||p.thumb}catch(err){console.error(err)}}} title="Copy photo" style={{position:"absolute",bottom:"2px",right:"2px",width:"20px",height:"20px",borderRadius:"3px",backgroundColor:"rgba(0,0,0,0.8)",border:"1px solid #333",color:"#aaa",fontSize:"11px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}} onMouseEnter={e=>e.currentTarget.style.color="#fff"} onMouseLeave={e=>e.currentTarget.style.color="#aaa"}>⎘</button>
+                  </div>)})}
+                </div>
+              </div>
+            )}
+
+            <div style={{borderTop:"1px solid #1a1a1a",margin:"4px 0"}} />
+            <div><label style={ST.label}>Font</label><select value={fontName} onChange={e=>setFontName(e.target.value)} style={{...ST.input,cursor:"pointer",appearance:"auto"}}>{FONT_OPTIONS.map(f=><option key={f} value={f}>{f}</option>)}{customFontName&&<option value={customFontName}>{customFontName}</option>}</select></div>
+            <div>
+              <label style={ST.label}>Custom Font <span style={{textTransform:"none",color:"#333"}}>(.ttf .woff2 .otf — select multiple for variants)</span></label>
+              <input ref={fontFileRef} type="file" accept=".ttf,.woff,.woff2,.otf" multiple onChange={e=>loadCustomFont(e.target.files)} style={{display:"none"}} />
+              <button onClick={()=>fontFileRef.current?.click()} style={{...ST.input,cursor:"pointer",fontSize:"12px",color:"#555",textAlign:"left"}}>{customFontName?`✓ ${customFontName}`:"Choose font file..."}</button>
+            </div>
+            <div>
+              <label style={ST.label}>Font Size <span style={{textTransform:"none",color:"#444"}}>{fontSize}px</span></label>
+              <div style={{display:"flex",alignItems:"center",gap:"8px"}}><span style={{fontSize:"10px",color:"#333"}}>10</span><input type="range" min={10} max={30} value={fontSize} onChange={e=>setFontSize(Number(e.target.value))} style={{flex:1,accentColor:"#555"}} /><span style={{fontSize:"10px",color:"#333"}}>30</span></div>
+            </div>
+            <div><label style={ST.label}>Author / Book</label><input value={author} onChange={e=>setAuthor(e.target.value)} placeholder="Author — Book Title" style={ST.input} /></div>
+            <div>
+              <label style={ST.label}>Tuple Data <span style={{textTransform:"none",color:"#333"}}>(editable)</span></label>
+              <textarea value={tupleRaw} onChange={e=>setTupleRaw(e.target.value)} spellCheck={false} style={{...ST.input,height:"300px",resize:"vertical",color:"#b8e64e",fontSize:"11px",fontFamily:"'DM Mono','Fira Code',monospace",lineHeight:"1.5"}} />
+            </div>
+            {error&&<div style={{padding:"8px 12px",backgroundColor:"#1a0f0f",border:"1px solid #331a1a",borderRadius:"6px",color:"#e55",fontSize:"11px",fontFamily:"'DM Mono',monospace"}}>{error}</div>}
+            <div style={{display:"flex",gap:"8px"}}>
+              <button onClick={doRender} style={{...ST.btn,flex:1,backgroundColor:"#fff",color:"#000"}}>Render</button>
+              {rendered&&<button onClick={doCopy} style={{...ST.btn,padding:"10px 14px",backgroundColor:copied?"#122e12":"transparent",color:copied?"#5cb85c":"#666",border:`1px solid ${copied?"#2a5a2a":"#222"}`}}>{copied?"✓ Copied":"Copy Image"}</button>}
+            </div>
+            <div style={{...ST.card,fontSize:"11px"}}>
+              <div style={{...ST.label,marginBottom:"6px"}}>Legend</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:"8px",marginBottom:"6px"}}>
+                {[["Male","#B5CDFD"],["Female","#FEC2D3"],["Internal","#FFF8B3"],["Other","#FDD9B0"],["Narr.",null]].map(([l,c])=>(<div key={l} style={{display:"flex",alignItems:"center",gap:"4px"}}><div style={{width:"10px",height:"10px",borderRadius:"2px",backgroundColor:c||"transparent",border:c?"none":"1px solid #333"}} /><span style={{color:"#555"}}>{l}</span></div>))}
+              </div>
+              <div style={{color:"#333",fontFamily:"'DM Mono',monospace",lineHeight:1.6,fontSize:"10px"}}>_flow = same line · _underline = underline · _bold = bold · _italic = italic · w*rd = censor</div>
+            </div>
+          </div>
+
+          <div style={{flex:1,padding:"18px",overflowY:"auto",display:"flex",flexDirection:"column",alignItems:"center"}}>
+            <div style={{...ST.label,alignSelf:"flex-start",marginBottom:"12px"}}>Preview{author&&<span style={{textTransform:"none",marginLeft:"10px",color:"#333",letterSpacing:"0"}}> — {author}</span>}</div>
+            <div style={{boxShadow:rendered?"0 4px 40px rgba(0,0,0,0.6)":"none",borderRadius:rendered?"2px":"0"}}><canvas ref={canvasRef} style={{display:rendered?"block":"none"}} /></div>
+            {!rendered&&(<div style={{width:"540px",height:"350px",backgroundColor:"#0f0f0f",borderRadius:"8px",border:"1px dashed #1a1a1a",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:"10px"}}><div style={{fontSize:"28px",opacity:0.2}}>📖</div><div style={{color:"#333",fontSize:"12px",fontFamily:"'DM Mono',monospace"}}>{tupleRaw?"Click Render to generate preview":"Waiting for Gemini response..."}</div></div>)}
+          </div>
+        </div>
+      )}
+
+      {/* CHAT DRAWER — collapsible at bottom, only on results */}
+      {activeTab==="results"&&step==="results"&&(
+        <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:50,transition:"all 0.3s ease"}}>
+          {/* Toggle bar */}
+          <div onClick={()=>{setChatOpen(!chatOpen);if(!chatOpen)setTimeout(()=>chatInputRef.current?.focus(),100)}} style={{padding:"10px 24px",backgroundColor:"#111",borderTop:"1px solid #1f1f1f",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",userSelect:"none"}}>
+            <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+              <span style={{fontSize:"14px"}}>💬</span>
+              <span style={{fontSize:"12px",fontWeight:600,color:"#888",fontFamily:UI_FONT}}>Ask Gemini about this scene</span>
+              {chatMessages.length>0&&<span style={{fontSize:"9px",backgroundColor:"#1a1a1a",padding:"1px 6px",borderRadius:"8px",color:"#666",fontFamily:"'DM Mono',monospace"}}>{chatMessages.length}</span>}
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
+              {chatOpen&&chatMessages.length>0&&(
+                <button onClick={e=>{e.stopPropagation();setChatMessages([])}} style={{...ST.btn,padding:"3px 10px",fontSize:"10px",backgroundColor:"transparent",color:"#444",border:"1px solid #1a1a1a"}}>Clear</button>
+              )}
+              <span style={{color:"#444",fontSize:"16px",transition:"transform 0.3s",transform:chatOpen?"rotate(180deg)":"rotate(0deg)"}}>▲</span>
+            </div>
+          </div>
+
+          {/* Chat panel */}
+          {chatOpen&&(
+            <div style={{backgroundColor:"#0d0d0d",borderTop:"1px solid #1a1a1a",height:"340px",display:"flex",flexDirection:"column"}}>
+              {/* Context mode toggle */}
+              <div style={{padding:"8px 24px",borderBottom:"1px solid #141414",display:"flex",alignItems:"center",gap:"12px",flexShrink:0}}>
+                <span style={{fontSize:"10px",color:"#444",fontFamily:"'DM Mono',monospace",textTransform:"uppercase",letterSpacing:"1px"}}>Context:</span>
+                <button onClick={()=>setChatContextMode("excerpt")} style={{padding:"4px 12px",fontSize:"11px",borderRadius:"12px",border:"1px solid",cursor:"pointer",fontFamily:UI_FONT,borderColor:chatContextMode==="excerpt"?"#444":"#1a1a1a",backgroundColor:chatContextMode==="excerpt"?"#1e1e1e":"transparent",color:chatContextMode==="excerpt"?"#ddd":"#555",transition:"all 0.15s"}}>Excerpt Only</button>
+                <button onClick={()=>setChatContextMode("full")} style={{padding:"4px 12px",fontSize:"11px",borderRadius:"12px",border:"1px solid",cursor:"pointer",fontFamily:UI_FONT,borderColor:chatContextMode==="full"?"#444":"#1a1a1a",backgroundColor:chatContextMode==="full"?"#1e1e1e":"transparent",color:chatContextMode==="full"?"#ddd":"#555",transition:"all 0.15s"}}>Full Book</button>
+                <span style={{fontSize:"10px",color:"#333",fontFamily:"'DM Mono',monospace",marginLeft:"4px"}}>{chatContextMode==="full"?"Gemini can see the entire book":"Gemini sees hook + caption + context + excerpt"}</span>
+              </div>
+
+              {/* Messages */}
+              <div style={{flex:1,overflowY:"auto",padding:"14px 24px",display:"flex",flexDirection:"column",gap:"10px"}}>
+                {chatMessages.length===0&&!chatLoading&&(
+                  <div style={{textAlign:"center",padding:"40px 20px",color:"#333"}}>
+                    <div style={{fontSize:"11px",fontFamily:"'DM Mono',monospace",marginBottom:"8px"}}>Ask anything about the scene, book, or excerpt</div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:"6px",justifyContent:"center"}}>
+                      {["What happens right before this scene?","Is there a better line from him in this chapter?","What's the emotional context here?","Find me a more intense version of this moment"].map(q=>(
+                        <button key={q} onClick={()=>{setChatInput(q);setTimeout(()=>chatInputRef.current?.focus(),50)}} style={{padding:"5px 10px",fontSize:"10px",borderRadius:"12px",border:"1px solid #1a1a1a",backgroundColor:"#111",color:"#555",cursor:"pointer",fontFamily:UI_FONT,transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor='#333';e.currentTarget.style.color='#888'}} onMouseLeave={e=>{e.currentTarget.style.borderColor='#1a1a1a';e.currentTarget.style.color='#555'}}>{q}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {chatMessages.map((m,i)=>(
+                  <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start",gap:"8px"}}>
+                    <div style={{maxWidth:"75%",padding:"10px 14px",borderRadius:m.role==="user"?"12px 12px 2px 12px":"12px 12px 12px 2px",backgroundColor:m.role==="user"?"#1a1a2e":"#141414",border:`1px solid ${m.isError?"#331a1a":m.role==="user"?"#252540":"#1e1e1e"}`,color:m.isError?"#e55":"#ccc",fontSize:"13px",lineHeight:"1.5",fontFamily:UI_FONT,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>
+                      {m.text}
+                    </div>
+                  </div>
+                ))}
+                {chatLoading&&(
+                  <div style={{display:"flex",justifyContent:"flex-start"}}>
+                    <div style={{padding:"10px 14px",borderRadius:"12px 12px 12px 2px",backgroundColor:"#141414",border:"1px solid #1e1e1e"}}>
+                      <span style={{display:"inline-flex",gap:"4px",alignItems:"center"}}>
+                        <span style={{width:"6px",height:"6px",borderRadius:"50%",backgroundColor:"#444",animation:"spin 1s linear infinite"}} />
+                        <span style={{fontSize:"12px",color:"#555",fontFamily:"'DM Mono',monospace"}}>Thinking...</span>
+                      </span>
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Input */}
+              <div style={{padding:"10px 24px 14px",borderTop:"1px solid #141414",display:"flex",gap:"8px",flexShrink:0}}>
+                <input ref={chatInputRef} value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendChat()}}} placeholder={apiKey?"Ask about this scene...":"Enter your API key on the Generate tab first"} disabled={!apiKey.trim()} style={{...ST.input,flex:1,fontSize:"13px",padding:"10px 14px",backgroundColor:"#111",borderColor:"#1f1f1f"}} />
+                <button onClick={sendChat} disabled={chatLoading||!chatInput.trim()||!apiKey.trim()} style={{...ST.btn,padding:"10px 20px",backgroundColor:chatLoading||!chatInput.trim()||!apiKey.trim()?"#151515":"#fff",color:chatLoading||!chatInput.trim()||!apiKey.trim()?"#444":"#000",fontSize:"13px",whiteSpace:"nowrap"}}>Send</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<BookTokApp />);
+  </script>
+</body>
+</html>
