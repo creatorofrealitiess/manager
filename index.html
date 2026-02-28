@@ -225,6 +225,113 @@ Output each section with these exact headers:
 **Context:**
 **Transfer Data:**`;
 
+// Gemini prompt for HYBRID mode — just find the scene and output raw text
+const GEMINI_SCENE_PROMPT = `Role: You are a viral BookTok strategist.
+Goal: Analyze the uploaded book and output marketing assets.
+
+Output Structure:
+1. The Hook (Slide 1): ONE punchy sentence, third person, max 10-15 words. High curiosity.
+
+2. The Caption: Format EXACTLY like this with line breaks (NOT slashes):
+[Short emotional reaction, max 5-6 words]
+📚 : [Title In Title Case] by [Author Name]
+[tropes in lowercase separated by periods]
+
+Example caption:
+The way he chose her over everything
+📚 : Twisted Love by Ana Huang
+dark romance. possessive hero. brother's best friend. enemies to lovers.
+
+CAPTION RULES:
+- First line: emotional reaction, NO emoji
+- Second line: 📚 : then book title in Title Case (NOT ALL CAPS), then by Author
+- Third line: tropes in lowercase separated by periods, end each with a period
+- Use line breaks between each line, NOT slashes
+
+3. The Context: 2-4 sentences about the scene.
+
+4. The Excerpt: Extract a contiguous 100-125 word passage from the book.
+
+EXCERPT SELECTION RULES:
+- The excerpt MUST be dialogue-heavy. Prioritise punchy back-and-forth exchanges.
+- Dialogue + internal thought should make up at least 60-70% of the word count.
+- Narrative lines should be SHORT (1-2 sentences max).
+- If the vibe scene has too much narrative, find the closest dialogue-heavy moment nearby instead.
+
+EXCERPT FORMAT RULES — CRITICAL:
+- Copy the passage EXACTLY as written in the book. Do NOT paraphrase, reword, combine, or condense ANY dialogue.
+- Preserve every line break between dialogue lines and narration exactly as the book has them.
+- Each line of dialogue must be on its own line. Each narration beat on its own line.
+- Censor explicit words with asterisks: f*ck, sh*t, d*mn, c*ck, p*ssy, etc.
+- Output the excerpt as PLAIN TEXT with line breaks — do NOT use tuple format, do NOT add tags.
+
+Example output format for the excerpt:
+"What are you doing?" I asked.
+"Getting into bed with my wife," he said.
+"Or did you expect me to sleep on the floor like a bodyguard?"
+She turned away, her jaw tight.
+"You haven't slept in this bed since we got married."
+
+Output each section with these exact headers:
+**Hook:**
+**Caption:**
+**Context:**
+**Excerpt:**`;
+
+// Sonnet prompt for tuple formatting
+const SONNET_TUPLE_PROMPT = `You are a precise text formatter. Your job is to convert a book excerpt into a Python-style list of tuples for a Kindle-style renderer.
+
+RULES:
+
+Each tuple is: ("text content", "tag")
+
+CHARACTER TAGS:
+- male = male character's dialogue
+- female = female character's dialogue (or first-person narrator who is female)
+- narrative = narration, action, speech tags (he said, she whispered, etc.)
+- internal = internal thought
+- other = other characters
+
+MODIFIER SUFFIXES (combine with base tag):
+- _flow = dialogue continues on same visual line as the speech tag after it
+- _underline = emotional peak (use on exactly ONE line, the most intense moment)
+- _bold = bold text
+- _italic = italic text
+- Combine freely: male_flow, female_bold, male_italic_flow, female_bold_italic_underline
+
+DIALOGUE FORMATTING:
+- Use doubled straight quotes "" as dialogue marks inside the string
+- Example: (""Hello there,"", "male")
+- The outer quotes are Python string delimiters. The inner "" are dialogue marks.
+- Do NOT use curly/smart quotes. Do NOT use triple quotes.
+
+_flow RULES:
+When dialogue and a speech tag appear on the SAME LINE, split into two tuples:
+- The DIALOGUE piece gets _flow
+- The speech tag gets a plain tag (usually narrative) with a leading space
+
+"Stay," she whispered.  →  (""Stay,"", "female_flow"), (" she whispered.", "narrative")
+"What are you doing?" I asked.  →  (""What are you doing?"", "female_flow"), (" I asked.", "narrative")
+"How dare you!" she snapped.  →  (""How dare you!"", "female_flow"), (" she snapped.", "narrative")
+
+_flow applies for commas, question marks, AND exclamation marks before the closing quote.
+
+Standalone dialogue on its own line = plain tag, NO _flow:
+"Say it."  →  (""Say it."", "male")
+
+SPLITTING RULES — CRITICAL:
+- EVERY tuple must contain ONLY dialogue OR ONLY narration. NEVER both.
+- If a line has dialogue + speech tag, split with _flow.
+- If two dialogue lines are on separate lines, they are SEPARATE tuples.
+- Leading space rule: ONLY the speech-tag continuation in a _flow pair starts with a space.
+
+CENSORSHIP:
+- Censor explicit words: f*ck, sh*t, d*mn, c*ck, cl*t, p*ssy, d*ck, c*m, c*nt, m*ans, po*nd, etc.
+
+OUTPUT FORMAT:
+- Output ONLY the Python list of tuples. No explanation, no markdown, no backticks.
+- Start with [ and end with ]`;
+
 // === IndexedDB v3 with categories + books ===
 const DB_NAME="booktok_photos", DB_VER=3, STORE="photos", CAT_STORE="categories", BOOK_STORE="books";
 function openDB(){return new Promise((s,j)=>{
@@ -560,6 +667,8 @@ function renderKindle(canvas, groups, scale, fontName, fontSize) {
 
 function parseGeminiResponse(text){const r={hook:"",caption:"",context:"",tupleRaw:""};const hk=text.match(/\*?\*?Hook:?\*?\*?\s*([\s\S]*?)(?=\*?\*?Caption:?\*?\*?)/i);const cp=text.match(/\*?\*?Caption:?\*?\*?\s*([\s\S]*?)(?=\*?\*?Context:?\*?\*?)/i);const cx=text.match(/\*?\*?Context:?\*?\*?\s*([\s\S]*?)(?=\*?\*?Transfer Data:?\*?\*?)/i);const td=text.match(/\*?\*?Transfer Data:?\*?\*?\s*([\s\S]*?)$/i);if(hk)r.hook=hk[1].trim();if(cp)r.caption=cp[1].trim();if(cx)r.context=cx[1].trim();if(td){let raw=td[1].trim().replace(/^```(?:python)?\s*/i,'').replace(/\s*```\s*$/,'');r.tupleRaw=raw.trim()}return r}
 
+function parseGeminiSceneResponse(text){const r={hook:"",caption:"",context:"",excerpt:""};const hk=text.match(/\*?\*?Hook:?\*?\*?\s*([\s\S]*?)(?=\*?\*?Caption:?\*?\*?)/i);const cp=text.match(/\*?\*?Caption:?\*?\*?\s*([\s\S]*?)(?=\*?\*?Context:?\*?\*?)/i);const cx=text.match(/\*?\*?Context:?\*?\*?\s*([\s\S]*?)(?=\*?\*?Excerpt:?\*?\*?)/i);const ex=text.match(/\*?\*?Excerpt:?\*?\*?\s*([\s\S]*?)$/i);if(hk)r.hook=hk[1].trim();if(cp)r.caption=cp[1].trim();if(cx)r.context=cx[1].trim();if(ex)r.excerpt=ex[1].trim().replace(/^```\s*/,'').replace(/\s*```\s*$/,'').trim();return r}
+
 // Auto-fix Gemini tuple issues:
 // 1. Split tuples that contain BOTH dialogue and narration
 // 2. Fix _flow tags: dialogue gets _flow, narrative continuation gets plain tag
@@ -714,6 +823,7 @@ function BookTokApp(){
   const[activeTab,setActiveTab]=useState("generate");
   const[step,setStep]=useState("upload");
   const[apiKey,setApiKey]=useState("");
+  const[anthropicKey,setAnthropicKey]=useState("");
   const[model,setModel]=useState("gemini-2.5-flash");
   const[pdfFile,setPdfFile]=useState(null);
   const[pdfText,setPdfText]=useState("");
@@ -905,22 +1015,53 @@ const baseName=fileArr[0].name.replace(/\.\w+$/,'').replace(/[_\-\s]*(bold[_\-\s
 
   const handlePDF=useCallback(async(file)=>{if(!file||file.type!=='application/pdf'){setError("Please upload a PDF file.");return}setPdfFile(file);setError("");setLoadingStatus("Extracting text...");setLoading(true);try{const t=await extractPDFText(file);if(!t.trim())throw new Error("No text found");setPdfText(t);setLoading(false);setLoadingStatus("")}catch(e){setError("Extract failed: "+e.message);setLoading(false);setLoadingStatus("")}},[]);
 
+  const useHybrid = !!anthropicKey.trim();
+
   const callGemini=useCallback(async()=>{
     if(!apiKey.trim()){setError("Please enter your Gemini API key.");return}
     if(!pdfText.trim()){setError("No book selected or PDF text extracted.");return}
     const vibe=customVibe.trim()||selectedVibe;if(!vibe){setError("Please select or enter a vibe.");return}
-    setError("");setLoading(true);setLoadingStatus("Sending to Gemini...");
+    setError("");setLoading(true);
     const truncated=pdfText.length>300000?pdfText.substring(0,300000):pdfText;
-    try{setLoadingStatus("Waiting for response...");
-      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{parts:[{text:`${GEMINI_SYSTEM_PROMPT}\n\nVibe/Trope to find: ${vibe}\n\nBook text:\n${truncated}`}]}],generationConfig:{temperature:0.9,maxOutputTokens:8192}})});
-      if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`API ${res.status}`)}
-      const data=await res.json();const text=data?.candidates?.[0]?.content?.parts?.[0]?.text;if(!text)throw new Error("Empty response");
-      const parsed=parseGeminiResponse(text);const fixedTuple=parsed.tupleRaw?autoFixFlowTags(parsed.tupleRaw):parsed.tupleRaw;setHook(parsed.hook);setCaption(parsed.caption);setContext(parsed.context);setTupleRaw(fixedTuple);
-      const bm=parsed.caption.match(/\uD83D\uDCDA\s*:?\s*(.+?)(?:\n|$)/);if(bm)setAuthor(bm[1].trim());else if(selectedBook)setAuthor(`${selectedBook.title} by ${selectedBook.author}`);
-      setStep("results");setActiveTab("results");setLoading(false);setLoadingStatus("");
-      if(fixedTuple)setTimeout(()=>autoRender(fixedTuple),300);
-    }catch(e){setError("Gemini error: "+e.message);setLoading(false);setLoadingStatus("")}
-  },[apiKey,model,pdfText,selectedVibe,customVibe,selectedBook]);
+
+    if(useHybrid){
+      // === HYBRID MODE: Gemini finds scene → Sonnet formats tuples ===
+      try{
+        // Step 1: Gemini finds the scene
+        setLoadingStatus("Gemini: Finding scene...");
+        const gemRes=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{parts:[{text:`${GEMINI_SCENE_PROMPT}\n\nVibe/Trope to find: ${vibe}\n\nBook text:\n${truncated}`}]}],generationConfig:{temperature:0.9,maxOutputTokens:8192}})});
+        if(!gemRes.ok){const e=await gemRes.json().catch(()=>({}));throw new Error("Gemini: "+(e?.error?.message||`API ${gemRes.status}`))}
+        const gemData=await gemRes.json();const gemText=gemData?.candidates?.[0]?.content?.parts?.[0]?.text;if(!gemText)throw new Error("Gemini returned empty response");
+        const scene=parseGeminiSceneResponse(gemText);
+        if(!scene.excerpt)throw new Error("Gemini didn't return an excerpt. Try again.");
+        setHook(scene.hook);setCaption(scene.caption);setContext(scene.context);
+        const bm=scene.caption.match(/\uD83D\uDCDA\s*:?\s*(.+?)(?:\n|$)/);if(bm)setAuthor(bm[1].trim());else if(selectedBook)setAuthor(`${selectedBook.title} by ${selectedBook.author}`);
+
+        // Step 2: Sonnet formats into tuples
+        setLoadingStatus("Sonnet: Formatting tuples...");
+        const sonRes=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":anthropicKey.trim(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4096,messages:[{role:"user",content:`${SONNET_TUPLE_PROMPT}\n\nHere is the excerpt to format:\n\n${scene.excerpt}`}]})});
+        if(!sonRes.ok){const e=await sonRes.json().catch(()=>({}));throw new Error("Sonnet: "+(e?.error?.message||`API ${sonRes.status}`))}
+        const sonData=await sonRes.json();const sonText=sonData?.content?.[0]?.text;if(!sonText)throw new Error("Sonnet returned empty response");
+        const cleanTuple=sonText.trim().replace(/^```(?:python)?\s*/i,'').replace(/\s*```\s*$/,'').trim();
+        const fixedTuple=autoFixFlowTags(cleanTuple);
+        setTupleRaw(fixedTuple);
+        setStep("results");setActiveTab("results");setLoading(false);setLoadingStatus("");
+        if(fixedTuple)setTimeout(()=>autoRender(fixedTuple),300);
+      }catch(e){setError(e.message);setLoading(false);setLoadingStatus("")}
+
+    } else {
+      // === GEMINI-ONLY MODE (original behavior) ===
+      try{setLoadingStatus("Sending to Gemini...");
+        const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{parts:[{text:`${GEMINI_SYSTEM_PROMPT}\n\nVibe/Trope to find: ${vibe}\n\nBook text:\n${truncated}`}]}],generationConfig:{temperature:0.9,maxOutputTokens:8192}})});
+        if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`API ${res.status}`)}
+        const data=await res.json();const text=data?.candidates?.[0]?.content?.parts?.[0]?.text;if(!text)throw new Error("Empty response");
+        const parsed=parseGeminiResponse(text);const fixedTuple=parsed.tupleRaw?autoFixFlowTags(parsed.tupleRaw):parsed.tupleRaw;setHook(parsed.hook);setCaption(parsed.caption);setContext(parsed.context);setTupleRaw(fixedTuple);
+        const bm=parsed.caption.match(/\uD83D\uDCDA\s*:?\s*(.+?)(?:\n|$)/);if(bm)setAuthor(bm[1].trim());else if(selectedBook)setAuthor(`${selectedBook.title} by ${selectedBook.author}`);
+        setStep("results");setActiveTab("results");setLoading(false);setLoadingStatus("");
+        if(fixedTuple)setTimeout(()=>autoRender(fixedTuple),300);
+      }catch(e){setError("Gemini error: "+e.message);setLoading(false);setLoadingStatus("")}
+    }
+  },[apiKey,anthropicKey,model,pdfText,selectedVibe,customVibe,selectedBook,useHybrid]);
 
   const autoRender=useCallback((raw)=>{const entries=parseTupleData(raw||tupleRaw);if(!entries.length)return;document.fonts.load(`500 ${fontSize}px "${fontName}"`).then(()=>{if(canvasRef.current){renderKindle(canvasRef.current,buildGroups(entries),2,fontName,fontSize);setRendered(true)}})},[tupleRaw,fontName,fontSize]);
   const doRender=useCallback(()=>{const entries=parseTupleData(tupleRaw);if(!entries.length){setError("No valid tuple data.");return}document.fonts.load(`500 ${fontSize}px "${fontName}"`).then(()=>{renderKindle(canvasRef.current,buildGroups(entries),2,fontName,fontSize);setRendered(true)})},[tupleRaw,fontName,fontSize]);
@@ -984,7 +1125,7 @@ const baseName=fileArr[0].name.replace(/\.\w+$/,'').replace(/[_\-\s]*(bold[_\-\s
         <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
           <span style={{fontSize:"20px"}}>📖</span>
           <span style={{fontSize:"16px",fontWeight:700,letterSpacing:"-0.3px"}}>BookTok Studio</span>
-          <span style={{fontSize:"9px",padding:"2px 7px",borderRadius:"3px",backgroundColor:"#1a1a1a",color:"#555",fontFamily:"'DM Mono',monospace",border:"1px solid #222",letterSpacing:"0.5px"}}>v4.2</span>
+          <span style={{fontSize:"9px",padding:"2px 7px",borderRadius:"3px",backgroundColor:"#1a1a1a",color:"#555",fontFamily:"'DM Mono',monospace",border:"1px solid #222",letterSpacing:"0.5px"}}>v5.0</span>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
           {step==="results"&&<button onClick={resetAll} style={{...ST.btn,backgroundColor:"transparent",color:"#555",border:"1px solid #222",fontSize:"11px",padding:"6px 12px"}}>← New Book</button>}
@@ -1005,18 +1146,29 @@ const baseName=fileArr[0].name.replace(/\.\w+$/,'').replace(/[_\-\s]*(bold[_\-\s
       {/* GENERATE TAB */}
       {activeTab==="generate"&&(
         <div style={{maxWidth:"720px",margin:"0 auto",padding:"32px 24px"}}>
-          {/* API Key & Model row */}
-          <div style={{display:"flex",gap:"14px",marginBottom:"28px"}}>
+          {/* API Keys & Model row */}
+          <div style={{display:"flex",gap:"14px",marginBottom:"12px"}}>
             <div style={{flex:1}}>
               <label style={ST.label}>Gemini API Key</label>
               <input type="password" value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="Paste your Gemini API key" style={{...ST.input,fontFamily:"'DM Mono',monospace",fontSize:"12px"}} />
             </div>
+            <div style={{flex:1}}>
+              <label style={ST.label}>Anthropic API Key <span style={{textTransform:"none",color:"#333"}}>(optional — enables hybrid mode)</span></label>
+              <input type="password" value={anthropicKey} onChange={e=>setAnthropicKey(e.target.value)} placeholder="Paste your Anthropic API key" style={{...ST.input,fontFamily:"'DM Mono',monospace",fontSize:"12px"}} />
+            </div>
             <div style={{width:"200px"}}>
-              <label style={ST.label}>Model</label>
+              <label style={ST.label}>Gemini Model</label>
               <select value={model} onChange={e=>setModel(e.target.value)} style={{...ST.input,cursor:"pointer",appearance:"auto",fontFamily:"'DM Mono',monospace",fontSize:"12px"}}>
                 {GEMINI_MODELS.map(m=><option key={m.id} value={m.id}>{m.label}</option>)}
               </select>
             </div>
+          </div>
+          {/* Mode indicator */}
+          <div style={{marginBottom:"28px",padding:"8px 14px",borderRadius:"6px",backgroundColor:anthropicKey.trim()?"#0f1a0f":"#111",border:`1px solid ${anthropicKey.trim()?"#1a2e1a":"#1a1a1a"}`,display:"flex",alignItems:"center",gap:"10px"}}>
+            <div style={{width:"8px",height:"8px",borderRadius:"50%",backgroundColor:anthropicKey.trim()?"#5cb85c":"#555"}} />
+            <span style={{fontSize:"11px",color:anthropicKey.trim()?"#8b8":"#555",fontFamily:"'DM Mono',monospace"}}>
+              {anthropicKey.trim()?"Hybrid Mode: Gemini finds scenes → Sonnet formats tuples":"Gemini-Only Mode: add Anthropic key to enable hybrid pipeline"}
+            </span>
           </div>
 
           {/* Book Library */}
@@ -1093,7 +1245,7 @@ const baseName=fileArr[0].name.replace(/\.\w+$/,'').replace(/[_\-\s]*(bold[_\-\s
 
           {error&&<div style={{padding:"10px 14px",backgroundColor:"#1a0f0f",border:"1px solid #331a1a",borderRadius:"6px",color:"#e55",fontSize:"12px",marginBottom:"16px",fontFamily:"'DM Mono',monospace"}}>{error}</div>}
           <button onClick={callGemini} disabled={loading||!selectedBook||!pdfText||(!selectedVibe&&!customVibe.trim())} style={{...ST.btn,width:"100%",padding:"14px",backgroundColor:loading||!selectedBook||!pdfText||(!selectedVibe&&!customVibe.trim())?"#151515":"#fff",color:loading||!selectedBook||!pdfText||(!selectedVibe&&!customVibe.trim())?"#444":"#000",fontSize:"14px"}}>
-            {loading?(<span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}><span style={{display:"inline-block",width:"14px",height:"14px",border:"2px solid #333",borderTopColor:"#888",borderRadius:"50%",animation:"spin 0.8s linear infinite"}} />{loadingStatus}</span>):"Generate BookTok Assets"}
+            {loading?(<span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}><span style={{display:"inline-block",width:"14px",height:"14px",border:"2px solid #333",borderTopColor:"#888",borderRadius:"50%",animation:"spin 0.8s linear infinite"}} />{loadingStatus}</span>):(useHybrid?"Generate — Hybrid Mode (Gemini + Sonnet)":"Generate BookTok Assets")}
           </button>
         </div>
       )}
