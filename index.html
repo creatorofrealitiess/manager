@@ -766,7 +766,7 @@ function BookTokApp(){
   const[chatMessages,setChatMessages]=useState([]);
   const[chatInput,setChatInput]=useState("");
   const[chatLoading,setChatLoading]=useState(false);
-  const[chatContextMode,setChatContextMode]=useState("excerpt"); // "excerpt" or "full"
+  const[chatContextMode,setChatContextMode]=useState("full"); // "excerpt" or "full"
   const chatEndRef=useRef(null);
   const chatInputRef=useRef(null);
 
@@ -944,9 +944,9 @@ const baseName=fileArr[0].name.replace(/\.\w+$/,'').replace(/[_\-\s]*(bold[_\-\s
     let systemCtx;
     if(chatContextMode==="full"&&pdfText){
       const truncBook=pdfText.length>200000?pdfText.substring(0,200000):pdfText;
-      systemCtx=`You are a helpful assistant for a BookTok content creator. You have access to the full book text and the current excerpt they're working with.\n\nBook: ${author||"Unknown"}\nVibe: ${selectedVibe||customVibe||"N/A"}\n\nCurrent excerpt:\n${excerptText}\n\nHook: ${hook}\nContext: ${context}\n\nFull book text:\n${truncBook}`;
+      systemCtx=`You are a knowledgeable book assistant. The user is reading a book and has questions about it — answer based on the book text provided. Focus on plot, characters, scenes, motivations, and context. Do NOT give content creation tips, filming advice, or social media suggestions unless explicitly asked.\n\nBook: ${author||"Unknown"}\nVibe they're exploring: ${selectedVibe||customVibe||"N/A"}\n\nCurrent excerpt they're looking at:\n${excerptText}\n\nHook: ${hook}\nContext: ${context}\n\nFull book text:\n${truncBook}`;
     } else {
-      systemCtx=`You are a helpful assistant for a BookTok content creator. You have the current excerpt and scene context they're working with.\n\nBook: ${author||"Unknown"}\nVibe: ${selectedVibe||customVibe||"N/A"}\n\nCurrent excerpt:\n${excerptText}\n\nHook: ${hook}\nCaption: ${caption}\nContext: ${context}`;
+      systemCtx=`You are a knowledgeable book assistant. The user is reading a book and has questions about it — answer based on the context provided. Focus on plot, characters, scenes, motivations, and context. Do NOT give content creation tips, filming advice, or social media suggestions unless explicitly asked.\n\nBook: ${author||"Unknown"}\nVibe they're exploring: ${selectedVibe||customVibe||"N/A"}\n\nCurrent excerpt they're looking at:\n${excerptText}\n\nHook: ${hook}\nCaption: ${caption}\nContext: ${context}`;
     }
 
     // Build conversation history for multi-turn
