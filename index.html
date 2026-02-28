@@ -361,14 +361,15 @@ function parseTupleData(raw) {
   const entries = [];
 
   // Pre-normalize: convert Sonnet-style escaped quotes to doubled quotes format
-  // Sonnet may output: ("\"Hello,\"", "male") or ("\u201CHello,\u201D", "male")
   let normalized = raw;
   // Convert curly quotes to straight for parsing consistency
   normalized = normalized.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
-  // Convert escaped \" inside tuples to doubled "" (Sonnet style → Gemini style)
-  // But be careful: only convert \" that are inside the text portion, not the outer string delimiters
+  // Split multi-tuple lines: Sonnet sometimes puts multiple tuples on one line
+  // e.g. (""Hello,"", "male_flow"), (" he said.", "narrative"),
+  // Split these into separate lines so Strategy 1 can handle them
+  normalized = normalized.replace(/\)\s*,\s*\(/g, ')\n(');
+  // Convert escaped \" inside tuples to doubled ""
   normalized = normalized.replace(/\(\s*"((?:[^)]*?))"\s*,\s*"(\w+)"\s*\)/g, (match, text, tag) => {
-    // If text has escaped quotes, unescape them and re-wrap with doubled quotes approach
     if (text.includes('\\"')) {
       let cleaned = text.replace(/\\"/g, '"');
       return `("${cleaned}", "${tag}")`;
@@ -688,6 +689,8 @@ function autoFixFlowTags(rawTuple) {
   // Normalize curly quotes and escaped quotes before processing
   rawTuple = rawTuple.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
   rawTuple = rawTuple.replace(/\\"/g, '"');
+  // Split multi-tuple lines into separate lines
+  rawTuple = rawTuple.replace(/\)\s*,\s*\(/g, ')\n(');
 
   const lines = rawTuple.split('\n');
   const result = [];
