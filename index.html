@@ -79,7 +79,7 @@ CAPTION RULES:
 
 3. The Context: 2-4 sentences about the scene.
 
-4. The Transfer Data: Extract contiguous 100-125 word excerpt.
+4. The Transfer Data: Extract contiguous 100-175 word excerpt.
 
 EXCERPT SELECTION RULES — THIS IS CRITICAL FOR TIKTOK:
 The excerpt MUST be dialogue-heavy. TikTok viewers scroll fast — walls of narrative text lose them immediately.
@@ -250,7 +250,7 @@ CAPTION RULES:
 
 3. The Context: 2-4 sentences about the scene.
 
-4. The Excerpt: Extract a contiguous 100-125 word passage from the book.
+4. The Excerpt: Extract a contiguous 100-175 word passage from the book.
 
 EXCERPT SELECTION RULES:
 - The excerpt MUST be dialogue-heavy. Prioritise punchy back-and-forth exchanges.
@@ -330,7 +330,9 @@ CENSORSHIP:
 
 OUTPUT FORMAT:
 - Output ONLY the Python list of tuples. No explanation, no markdown, no backticks.
-- Start with [ and end with ]`;
+- Start with [ and end with ]
+- Use DOUBLED straight quotes "" for dialogue marks inside strings — NOT escaped quotes, NOT curly quotes.
+- Example: (""Hello,"", "male_flow") — the outer " are string delimiters, inner "" are dialogue marks.`;
 
 // === IndexedDB v3 with categories + books ===
 const DB_NAME="booktok_photos", DB_VER=3, STORE="photos", CAT_STORE="categories", BOOK_STORE="books";
@@ -358,9 +360,25 @@ function resizeImg(d,mW=200){return new Promise(s=>{const i=new Image();i.onload
 function parseTupleData(raw) {
   const entries = [];
 
+  // Pre-normalize: convert Sonnet-style escaped quotes to doubled quotes format
+  // Sonnet may output: ("\"Hello,\"", "male") or ("\u201CHello,\u201D", "male")
+  let normalized = raw;
+  // Convert curly quotes to straight for parsing consistency
+  normalized = normalized.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+  // Convert escaped \" inside tuples to doubled "" (Sonnet style → Gemini style)
+  // But be careful: only convert \" that are inside the text portion, not the outer string delimiters
+  normalized = normalized.replace(/\(\s*"((?:[^)]*?))"\s*,\s*"(\w+)"\s*\)/g, (match, text, tag) => {
+    // If text has escaped quotes, unescape them and re-wrap with doubled quotes approach
+    if (text.includes('\\"')) {
+      let cleaned = text.replace(/\\"/g, '"');
+      return `("${cleaned}", "${tag}")`;
+    }
+    return match;
+  });
+
   // STRATEGY 1: Line-by-line robust parsing
   // Handles: doubled "" quotes, triple """, curly quotes, and plain strings
-  const lines = raw.split('\n');
+  const lines = normalized.split('\n');
   for (const line of lines) {
     const t = line.trim();
     if (!t.startsWith('(')) continue;
@@ -377,19 +395,15 @@ function parseTupleData(raw) {
     while (trailQ < inner.length && inner[inner.length - 1 - trailQ] === '"') trailQ++;
 
     if (leadQ >= 3 && trailQ >= 3) {
-      // Triple or more quotes — strip outer string delimiter AND extra dialogue quotes, keep one pair
       inner = inner.substring(leadQ - 1, inner.length - (trailQ - 1));
     } else if (leadQ >= 2 && trailQ >= 2) {
-      // Doubled quotes — strip all but 1 from each side (normal dialogue format)
       inner = inner.substring(leadQ - 1, inner.length - (trailQ - 1));
     } else if (leadQ >= 1 && trailQ >= 1) {
-      // Single quotes — just the string delimiters
       inner = inner.substring(1, inner.length - 1);
     }
 
     // Convert remaining straight " to curly quotes (open/close toggle)
     let result = '';
-    // If text starts with a space, it's a flow continuation — first " should be closing
     let nextIsOpen = !inner.startsWith(' ');
     for (let ci = 0; ci < inner.length; ci++) {
       if (inner[ci] === '"') {
@@ -406,8 +420,6 @@ function parseTupleData(raw) {
   if (entries.length > 0) return entries;
 
   // STRATEGY 2: Regex fallback for compact/single-line formats
-  let normalized = raw.replace(/\u201C|\u201D/g, '"').replace(/\u2018|\u2019/g, "'");
-  normalized = normalized.replace(/""{2,}/g, '"');
   const regex = /\(\s*"((?:[^"\\]|\\.)*)"\s*,\s*"(\w+)"\s*\)/g;
   let m;
   while ((m = regex.exec(normalized)) !== null) {
@@ -1039,7 +1051,7 @@ const baseName=fileArr[0].name.replace(/\.\w+$/,'').replace(/[_\-\s]*(bold[_\-\s
 
         // Step 2: Sonnet formats into tuples
         setLoadingStatus("Sonnet: Formatting tuples...");
-        const sonRes=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":anthropicKey.trim(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4096,messages:[{role:"user",content:`${SONNET_TUPLE_PROMPT}\n\nHere is the excerpt to format:\n\n${scene.excerpt}`}]})});
+        const sonRes=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":anthropicKey.trim(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:4096,messages:[{role:"user",content:`${SONNET_TUPLE_PROMPT}\n\nHere is the excerpt to format:\n\n${scene.excerpt}`}]})});
         if(!sonRes.ok){const e=await sonRes.json().catch(()=>({}));throw new Error("Sonnet: "+(e?.error?.message||`API ${sonRes.status}`))}
         const sonData=await sonRes.json();const sonText=sonData?.content?.[0]?.text;if(!sonText)throw new Error("Sonnet returned empty response");
         const cleanTuple=sonText.trim().replace(/^```(?:python)?\s*/i,'').replace(/\s*```\s*$/,'').trim();
