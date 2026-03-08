@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Post Maker — BookTok Post Generator</title>
+  <title>Post Maker</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
@@ -693,6 +693,16 @@ function parseGeminiResponse(text){const r={hook:"",caption:"",context:"",tupleR
 
 function parseGeminiSceneResponse(text){const r={hook:"",caption:"",context:"",excerpt:""};const hk=text.match(/\*?\*?Hook:?\*?\*?\s*([\s\S]*?)(?=\*?\*?Caption:?\*?\*?)/i);const cp=text.match(/\*?\*?Caption:?\*?\*?\s*([\s\S]*?)(?=\*?\*?Context:?\*?\*?)/i);const cx=text.match(/\*?\*?Context:?\*?\*?\s*([\s\S]*?)(?=\*?\*?Excerpt:?\*?\*?)/i);const ex=text.match(/\*?\*?Excerpt:?\*?\*?\s*([\s\S]*?)$/i);if(hk)r.hook=hk[1].trim();if(cp)r.caption=cp[1].trim();if(cx)r.context=cx[1].trim();if(ex)r.excerpt=ex[1].trim().replace(/^```\s*/,'').replace(/\s*```\s*$/,'').trim();return r}
 
+function splitReactionFromCaption(captionText){
+  if(!captionText)return{reaction:"",caption:""};
+  const lines=captionText.split('\n').filter(l=>l.trim());
+  // First line is reaction if it doesn't start with 📚 or —
+  if(lines.length>0&&!lines[0].includes('📚')&&!lines[0].startsWith('—')){
+    return{reaction:lines[0].trim(),caption:lines.slice(1).join('\n')};
+  }
+  return{reaction:"",caption:captionText};
+}
+
 // Auto-fix Gemini tuple issues:
 // 1. Split tuples that contain BOTH dialogue and narration
 // 2. Fix _flow tags: dialogue gets _flow, narrative continuation gets plain tag
@@ -867,6 +877,7 @@ function BookTokApp(){
   const[loadingStatus,setLoadingStatus]=useState("");
   const[hook,setHook]=useState("");
   const[caption,setCaption]=useState("");
+  const[reaction,setReaction]=useState("");
   const[context,setContext]=useState("");
   const[tupleRaw,setTupleRaw]=useState("");
   const[rendered,setRendered]=useState(false);
@@ -1076,7 +1087,7 @@ const baseName=fileArr[0].name.replace(/\.\w+$/,'').replace(/[_\-\s]*(bold[_\-\s
         const gemData=await gemRes.json();const gemText=gemData?.candidates?.[0]?.content?.parts?.[0]?.text;if(!gemText)throw new Error("Gemini returned empty response");
         const scene=parseGeminiSceneResponse(gemText);
         if(!scene.excerpt)throw new Error("Gemini didn't return an excerpt. Try again.");
-        setHook(scene.hook);setCaption(scene.caption);setContext(scene.context);
+        setHook(scene.hook);const _sc=splitReactionFromCaption(scene.caption);setReaction(_sc.reaction);setCaption(_sc.caption);setContext(scene.context);
         const bm=scene.caption.match(/\uD83D\uDCDA\s*:?\s*(.+?)(?:\n|$)/);if(bm)setAuthor(bm[1].trim());else if(selectedBook)setAuthor(`${selectedBook.title} by ${selectedBook.author}`);
 
         // Step 2: Sonnet formats into tuples
@@ -1097,7 +1108,7 @@ const baseName=fileArr[0].name.replace(/\.\w+$/,'').replace(/[_\-\s]*(bold[_\-\s
         const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{parts:[{text:`${GEMINI_SYSTEM_PROMPT}\n\nVibe/Trope to find: ${vibe}\n\nBook text:\n${truncated}`}]}],generationConfig:{temperature:0.9,maxOutputTokens:8192}})});
         if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`API ${res.status}`)}
         const data=await res.json();const text=data?.candidates?.[0]?.content?.parts?.[0]?.text;if(!text)throw new Error("Empty response");
-        const parsed=parseGeminiResponse(text);const fixedTuple=parsed.tupleRaw?autoFixFlowTags(parsed.tupleRaw):parsed.tupleRaw;setHook(parsed.hook);setCaption(parsed.caption);setContext(parsed.context);setTupleRaw(fixedTuple);
+        const parsed=parseGeminiResponse(text);const fixedTuple=parsed.tupleRaw?autoFixFlowTags(parsed.tupleRaw):parsed.tupleRaw;setHook(parsed.hook);const _pc=splitReactionFromCaption(parsed.caption);setReaction(_pc.reaction);setCaption(_pc.caption);setContext(parsed.context);setTupleRaw(fixedTuple);
         const bm=parsed.caption.match(/\uD83D\uDCDA\s*:?\s*(.+?)(?:\n|$)/);if(bm)setAuthor(bm[1].trim());else if(selectedBook)setAuthor(`${selectedBook.title} by ${selectedBook.author}`);
         setStep("results");setActiveTab("excerpt");setLoading(false);setLoadingStatus("");
         if(fixedTuple)setTimeout(()=>autoRender(fixedTuple),300);
@@ -1109,7 +1120,7 @@ const baseName=fileArr[0].name.replace(/\.\w+$/,'').replace(/[_\-\s]*(bold[_\-\s
   const doRender=useCallback(()=>{const entries=parseTupleData(tupleRaw);if(!entries.length){setError("No valid tuple data.");return}document.fonts.load(`500 ${fontSize}px "${fontName}"`).then(()=>{renderKindle(canvasRef.current,buildGroups(entries),2,fontName,fontSize);setRendered(true)})},[tupleRaw,fontName,fontSize]);
   const doCopy=useCallback(async()=>{try{const blob=await new Promise(r=>canvasRef.current.toBlob(r,'image/png'));await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);setCopied(true);setTimeout(()=>setCopied(false),2000)}catch(e){console.error(e)}},[]);
   const copyField=useCallback(async(text,field)=>{try{await navigator.clipboard.writeText(text);setCopiedField(field);setTimeout(()=>setCopiedField(""),1500)}catch(e){console.error(e)}},[]);
-  const resetAll=useCallback(()=>{setStep("upload");setActiveTab("generate");setWizardStep(1);setPdfFile(null);setPdfText("");setSelectedVibe("");setCustomVibe("");setHook("");setCaption("");setContext("");setTupleRaw("");setRendered(false);setAuthor("");setError("");setSelectedPhotos([]);setAiPickedPhotos([]);setSelectedBook(null);setChatMessages([]);setChatOpen(false);setHookVariants([]);setHookForgeOpen(false);setHookForgeError("");setDetectedTropes([]);setMysteryMode(false);window._pinterestSearches=null},[]);
+  const resetAll=useCallback(()=>{setStep("upload");setActiveTab("generate");setWizardStep(1);setPdfFile(null);setPdfText("");setSelectedVibe("");setCustomVibe("");setHook("");setCaption("");setReaction("");setContext("");setTupleRaw("");setRendered(false);setAuthor("");setError("");setSelectedPhotos([]);setAiPickedPhotos([]);setSelectedBook(null);setChatMessages([]);setChatOpen(false);setHookVariants([]);setHookForgeOpen(false);setHookForgeError("");setDetectedTropes([]);setMysteryMode(false);window._pinterestSearches=null},[]);
 
   // Auto-scroll chat to bottom
   useEffect(()=>{if(chatEndRef.current)chatEndRef.current.scrollIntoView({behavior:"smooth"})},[chatMessages,chatLoading]);
@@ -1132,18 +1143,17 @@ const baseName=fileArr[0].name.replace(/\.\w+$/,'').replace(/[_\-\s]*(bold[_\-\s
       systemCtx=`You are a knowledgeable book assistant. The user is reading a book and has questions about it — answer based on the context provided. Focus on plot, characters, scenes, motivations, and context. Do NOT give content creation tips, filming advice, or social media suggestions unless explicitly asked.\n\nBook: ${author||"Unknown"}\nVibe they're exploring: ${selectedVibe||customVibe||"N/A"}\n\nCurrent excerpt they're looking at:\n${excerptText}\n\nHook: ${hook}\nCaption: ${caption}\nContext: ${context}`;
     }
 
-    // Build conversation history for multi-turn
-    const historyParts=[];
-    historyParts.push({text:systemCtx});
+    // Build conversation history for multi-turn using proper Gemini format
+    const contents=[];
     for(const m of chatMessages){
-      historyParts.push({text:(m.role==="user"?"User: ":"Assistant: ")+m.text});
+      contents.push({role:m.role==="user"?"user":"model",parts:[{text:m.text}]});
     }
-    historyParts.push({text:"User: "+msg});
+    contents.push({role:"user",parts:[{text:msg}]});
 
     try{
       const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`,{
         method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({contents:[{parts:historyParts}],generationConfig:{temperature:0.7,maxOutputTokens:4096}})
+        body:JSON.stringify({systemInstruction:{parts:[{text:systemCtx}]},contents,generationConfig:{temperature:0.7,maxOutputTokens:4096}})
       });
       if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`API ${res.status}`)}
       const data=await res.json();
@@ -1253,9 +1263,10 @@ No markdown, no backticks.
       if(result.reaction&&result.tropes){
         const bookLine=author||"[Book Title] by [Author]";
         const tropeStr=result.tropes.map(t=>'— '+t).join('\n');
+        setReaction(result.reaction);
         const newCaption=mysteryMode
-          ?`${result.reaction}\n${tropeStr}`
-          :`${result.reaction}\n📚 : ${bookLine}\n${tropeStr}`;
+          ?`${tropeStr}`
+          :`📚 : ${bookLine}\n${tropeStr}`;
         setCaption(newCaption);
       }
       if(result.pinterest_searches){
@@ -1279,9 +1290,8 @@ No markdown, no backticks.
     } else {
       // Add book title line back if missing
       if(!caption.includes('📚')&&author){
-        const reaction=lines[0]||'';
-        const tropes=lines.filter(l=>!l.includes('📚')&&l!==reaction).join('\n');
-        setCaption(`${reaction}\n📚 : ${author}\n${tropes}`);
+        const tropes=lines.filter(l=>!l.includes('📚')).join('\n');
+        setCaption(`📚 : ${author}\n${tropes}`);
       }
     }
   },[mysteryMode]);
@@ -1297,6 +1307,7 @@ No markdown, no backticks.
       <div style={{borderBottom:"1px solid #e8e6e1",padding:"12px 24px",display:"flex",alignItems:"center",justifyContent:"space-between",background:"#fff"}}>
         <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
           <span style={{fontFamily:"'Fraunces',serif",fontSize:"18px",fontWeight:700,color:"#1a1815",letterSpacing:"-0.3px"}}>Post<span style={{color:"#e85d3a"}}>Maker</span></span>
+          <span style={{fontSize:"10px",color:"#a09a93",fontWeight:400}}>BookTok Post Generator</span>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
           {step==="results"&&<button onClick={resetAll} style={{...ST.btn,backgroundColor:"transparent",color:"#6b6660",border:"1px solid #e8e6e1",fontSize:"11px",padding:"6px 14px",borderRadius:"20px"}}>← New Book</button>}
@@ -1592,6 +1603,15 @@ No markdown, no backticks.
               )}
             </div>
 
+            {/* === REACTION === */}
+            {reaction&&(<div style={ST.card}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
+                <label style={{...ST.label,marginBottom:0}}>Reaction <span style={{textTransform:"none",color:"#c4bfb8"}}>(first line of caption)</span></label>
+                <CopyBtn field="reaction" text={reaction} />
+              </div>
+              <input value={reaction} onChange={e=>setReaction(e.target.value)} style={{...ST.input,fontSize:"14px",fontWeight:600,fontStyle:"italic",color:"#1a1815"}} />
+            </div>)}
+
             {/* === CAPTION BUILDER === */}
             <div style={ST.card}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
@@ -1621,7 +1641,7 @@ No markdown, no backticks.
                   <div style={{display:"flex",flexDirection:"column",gap:"4px"}}>
                     {window._pinterestSearches.map((s,i)=>(
                       <div key={i} style={{display:"flex",alignItems:"center",gap:"6px"}}>
-                        <span style={{fontSize:"11px",color:"#2da562",fontFamily:"'DM Sans', sans-serif",flex:1}}>{s}</span>
+                        <a href={`https://www.pinterest.com/search/pins/?q=${encodeURIComponent(s)}`} target="_blank" rel="noopener noreferrer" style={{fontSize:"11px",color:"#2da562",fontFamily:"'DM Sans', sans-serif",flex:1,textDecoration:"none",cursor:"pointer"}} onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'} onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>{s}</a>
                         <button onClick={()=>copyField(s,"ps"+i)} style={{...ST.btn,padding:"1px 6px",fontSize:"9px",backgroundColor:"transparent",color:copiedField==="ps"+i?"#5cb85c":"#a09a93",border:"1px solid #e8e6e1"}}>{copiedField==="ps"+i?"✓":"Copy"}</button>
                       </div>
                     ))}
