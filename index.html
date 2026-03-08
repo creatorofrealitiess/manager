@@ -1125,6 +1125,9 @@ const baseName=fileArr[0].name.replace(/\.\w+$/,'').replace(/[_\-\s]*(bold[_\-\s
   // Auto-scroll chat to bottom
   useEffect(()=>{if(chatEndRef.current)chatEndRef.current.scrollIntoView({behavior:"smooth"})},[chatMessages,chatLoading]);
 
+  // Auto-rerender canvas when switching back to Excerpt tab
+  useEffect(()=>{if(activeTab==="excerpt"&&rendered&&tupleRaw&&canvasRef.current){setTimeout(()=>autoRender(tupleRaw),100)}},[activeTab]);
+
   const sendChat=useCallback(async()=>{
     const msg=chatInput.trim();
     if(!msg||!apiKey.trim())return;
@@ -1250,7 +1253,7 @@ Excerpt: ${excerptText.substring(0,600)}
 Return ONLY a JSON object with:
 1. "tropes" - array of trope strings in lowercase (e.g. "enemies to lovers", "arranged marriage", "forced proximity", "mafia romance", "he falls first", "grumpy x sunshine", "stalker romance", "hockey romance", "fake dating", "brother's best friend", "dark romance", "possessive hero", "touch her and die", "bratva romance", "dragon shifter", "fantasy romance", "second chance", "forbidden love", etc.)
 2. "reaction" - a short emotional reaction line (3-6 words, no emoji, for the caption first line). Make it feel like a real reader's gut reaction. Examples: "The way he chose her", "I am not okay right now", "He really said that to her", "This man will be the death of me", "The yearning is killing me"
-3. "pinterest_searches" - array of 3-4 Pinterest search strings that would find COUPLE PHOTOS or CHARACTER PHOTOS suitable as a TikTok slideshow background. These should find real photos of people, not illustrations or abstract art. Think about what you'd actually search on Pinterest to find a photo of a couple or person that matches this scene. Examples: "couple almost kissing dark aesthetic", "man in suit looking intense", "couple arguing hallway cinematic", "hockey player back view ice rink", "man carrying woman bridal style", "couple forehead touch intimate", "woman walking away man reaching for her". Be SPECIFIC about the pose, setting, and mood — not abstract mood words.
+3. "pinterest_searches" - array of 3-4 Pinterest search strings that would find aesthetic COUPLE or CHARACTER photos for a BookTok slideshow background. These need to work as actual Pinterest searches — broad enough to return results but specific enough to match the vibe. Think about what BookTok creators actually search for: moody couple aesthetics, dark romance vibes, cinematic couple shots. Good examples: "dark romance couple aesthetic", "couple close faces intense", "man and woman tension aesthetic", "mafia couple dark cinematic", "couple in rain dramatic", "enemies to lovers aesthetic couple", "possessive hold couple dark". Keep searches to 3-5 words. Do NOT write overly specific scene descriptions that won't return Pinterest results.
 
 No markdown, no backticks.
 {"tropes":["..."],"reaction":"...","pinterest_searches":["..."]}`}]})});
@@ -1609,7 +1612,7 @@ No markdown, no backticks.
                 <label style={{...ST.label,marginBottom:0}}>Reaction <span style={{textTransform:"none",color:"#c4bfb8"}}>(first line of caption)</span></label>
                 <CopyBtn field="reaction" text={reaction} />
               </div>
-              <input value={reaction} onChange={e=>setReaction(e.target.value)} style={{...ST.input,fontSize:"14px",fontWeight:600,fontStyle:"italic",color:"#1a1815"}} />
+              <input value={reaction} onChange={e=>setReaction(e.target.value)} style={{...ST.input,fontSize:"14px",fontWeight:600,color:"#1a1815"}} />
             </div>)}
 
             {/* === CAPTION BUILDER === */}
