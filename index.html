@@ -527,18 +527,25 @@ const fd=new Date(tcalYr,tcalMo,1).getDay(),dim=new Date(tcalYr,tcalMo+1,0).getD
 let cdh='',dc=1,nc=1;const tc=Math.ceil((fd+dim)/7)*7;
 for(let i=0;i<tc;i++){let dn,oth=false,ds='';if(i<fd){dn=pd-fd+i+1;oth=true;const pm=tcalMo===0?11:tcalMo-1,py=tcalMo===0?tcalYr-1:tcalYr;ds=`${py}-${String(pm+1).padStart(2,'0')}-${String(dn).padStart(2,'0')}`}else if(dc>dim){dn=nc++;oth=true;const nm=tcalMo===11?0:tcalMo+1,ny=tcalMo===11?tcalYr+1:tcalYr;ds=`${ny}-${String(nm+1).padStart(2,'0')}-${String(dn).padStart(2,'0')}`}else{dn=dc++;ds=`${tcalYr}-${String(tcalMo+1).padStart(2,'0')}-${String(dn).padStart(2,'0')}`}
 const ist=!oth&&dn===today.getDate()&&tcalMo===today.getMonth()&&tcalYr===today.getFullYear();
-const dayTasks=tasks.filter(t=>t.dueDate===ds&&!t.archived);
-// Group by category
+const dayTasks=tasks.filter(t=>t.dueDate===ds);
+// Group by category, merge Batch+Draft into BD
 let itemsH='';
-const cats={};dayTasks.forEach(t=>{if(!cats[t.category])cats[t.category]=[];const author=getAuthorFromTask(t.text);if(!cats[t.category].find(x=>x.author===author&&x.done===!!t.done))cats[t.category].push({author,project:t.project,done:!!t.done})});
-const catLabels={Batch:'B',Draft:'D',Post:'P'};
-for(const[cat,authors]of Object.entries(cats)){itemsH+=`<div class="tcal-cat-row"><span class="tcal-cat-label">${catLabels[cat]||cat[0]}</span><div class="tcal-authors">${authors.map(a=>{const c=PROJ[a.project]?.color||'#999';return`<span class="tcal-author ${a.done?'tcal-done':''}" style="background:${c}15;color:${c}">${a.author}</span>`}).join('')}</div></div>`}
+const cats={};dayTasks.forEach(t=>{if(!cats[t.category])cats[t.category]=[];const author=getAuthorFromTask(t.text);const isDone=!!t.done||!!t.archived;if(!cats[t.category].find(x=>x.author===author&&x.done===isDone))cats[t.category].push({author,project:t.project,done:isDone})});
+// Merge Batch and Draft
+const merged={};
+if(cats['Batch']||cats['Draft']){const bdAuthors={};
+(cats['Batch']||[]).forEach(a=>{if(!bdAuthors[a.author])bdAuthors[a.author]={project:a.project,bDone:a.done,dDone:true};else bdAuthors[a.author].bDone=a.done});
+(cats['Draft']||[]).forEach(a=>{if(!bdAuthors[a.author])bdAuthors[a.author]={project:a.project,bDone:true,dDone:a.done};else bdAuthors[a.author].dDone=a.done});
+merged['BD']=Object.entries(bdAuthors).map(([author,d])=>({author,project:d.project,done:d.bDone&&d.dDone}))}
+if(cats['Post'])merged['Post']=cats['Post'];
+const catLabels={BD:'BD',Post:'P'};
+for(const[cat,authors]of Object.entries(merged)){itemsH+=`<div class="tcal-cat-row"><span class="tcal-cat-label">${catLabels[cat]||cat[0]}</span><div class="tcal-authors">${authors.map(a=>{const c=PROJ[a.project]?.color||'#999';return`<span class="tcal-author ${a.done?'tcal-done':''}" style="background:${c}15;color:${c}">${a.author}</span>`}).join('')}</div></div>`}
 cdh+=`<div class="cal-day ${oth?'oth':''} ${ist?'today':''}"><div class="cal-dn">${dn}</div><div class="tcal-day-tasks">${itemsH}</div></div>`}
 
 el.innerHTML=`<div class="sec-hd"><div class="sec-t">Planner</div><button class="task-hd-add" onclick="openTaskModal()">+ Add Task</button></div>
 <div class="cal-hd"><div class="cal-nav"><button class="cal-nb" onclick="chTcMo(-1)">&#8249;</button><div class="cal-mo">${mos[tcalMo]} ${tcalYr}</div><button class="cal-nb" onclick="chTcMo(1)">&#8250;</button></div><button class="cal-today" onclick="goTcTd()">Today</button></div>
 <div class="cal-grid"><div class="cal-wk">${dys.map(d=>`<div class="cal-wd">${d}</div>`).join('')}</div><div class="cal-days">${cdh}</div></div>
-<div class="cal-legend"><div class="leg-i"><span style="font-size:.6rem;font-weight:700;color:var(--txt3);margin-right:2px">B</span>Batch</div><div class="leg-i"><span style="font-size:.6rem;font-weight:700;color:var(--txt3);margin-right:2px">D</span>Draft</div><div class="leg-i"><span style="font-size:.6rem;font-weight:700;color:var(--txt3);margin-right:2px">P</span>Post</div><div style="width:8px"></div><div class="leg-i"><div class="leg-d" style="background:var(--re)"></div>RE</div><div class="leg-i"><div class="leg-d" style="background:var(--dk)"></div>DK</div><div class="leg-i"><div class="leg-d" style="background:var(--pv)"></div>PV</div></div>`}
+<div class="cal-legend"><div class="leg-i"><span style="font-size:.6rem;font-weight:700;color:var(--txt3);margin-right:2px">BD</span>Batch+Draft</div><div class="leg-i"><span style="font-size:.6rem;font-weight:700;color:var(--txt3);margin-right:2px">P</span>Post</div><div style="width:8px"></div><div class="leg-i"><div class="leg-d" style="background:var(--re)"></div>RE</div><div class="leg-i"><div class="leg-d" style="background:var(--dk)"></div>DK</div><div class="leg-i"><div class="leg-d" style="background:var(--pv)"></div>PV</div></div>`}
 function chTcMo(d){tcalMo+=d;if(tcalMo>11){tcalMo=0;tcalYr++}if(tcalMo<0){tcalMo=11;tcalYr--}renderTaskCal()}
 function goTcTd(){const t=new Date();tcalMo=t.getMonth();tcalYr=t.getFullYear();renderTaskCal()}
 
