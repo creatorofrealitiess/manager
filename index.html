@@ -503,7 +503,7 @@ const subKey=cat+'-'+pk;const subOpen=openSubs[subKey];
 h+=`<div class="task-sub"><div class="task-sub-hd ${subOpen?'open':''} proj-${pk.toLowerCase()}" onclick="togSub2('${subKey}',this)"><div class="task-sub-dot" style="background:${PROJ[pk].color}"></div><div class="task-sub-nm">${PROJ[pk].name}</div><span class="task-sub-arr">&#9660;</span></div><div class="task-sub-body ${subOpen?'open':''}">`;
 // Group by date
 let lastDate='';
-subTasks.forEach(t=>{const dueClass=t.dueDate?(t.dueDate<todayStr?'overdue':t.dueDate===todayStr?'today-due':'future'):'';
+subTasks.forEach(t=>{const dueClass=t.dueDate?(t.done?(t.dueDate===todayStr?'today-due':'future'):t.dueDate<todayStr?'overdue':t.dueDate===todayStr?'today-due':'future'):'';
 const dateLabel=t.dueDate||'No date';
 if(dateLabel!==lastDate){const hdClass=t.dueDate?(t.dueDate<todayStr?'overdue-hd':t.dueDate===todayStr?'today-hd':''):'';
 const displayDate=t.dueDate?(t.dueDate===todayStr?'Today':t.dueDate<todayStr?'Overdue — '+formatDate(t.dueDate):formatDate(t.dueDate)):'No due date';
@@ -512,7 +512,7 @@ h+=taskItemH(t,dueClass)});
 if(!subTasks.length){h+=`<div style="padding:10px 14px;font-size:.78rem;color:var(--txt3);text-align:center">No tasks</div>`}
 h+=`</div></div>`});
 
-if(done.length){h+=`<div class="task-completed-hd" onclick="togCompleted(this)">&#9662; Completed (${done.length})</div><div class="task-completed-body">`;done.forEach(t=>{const dueClass=t.dueDate?(t.dueDate<todayStr?'overdue':t.dueDate===todayStr?'today-due':'future'):'';h+=taskItemH(t,dueClass)});h+='</div>'}
+if(done.length){h+=`<div class="task-completed-hd" onclick="togCompleted(this)">&#9662; Completed (${done.length})</div><div class="task-completed-body">`;done.forEach(t=>{const dueClass='future';h+=taskItemH(t,dueClass)});h+='</div>'}
 h+='</div></div>'});
 el.innerHTML=h}
 
