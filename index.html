@@ -417,7 +417,7 @@ async function saveFcmToken(){
   try{
     if(!messaging||!user)return;
     // VAPID key — replace with yours from Firebase Console
-    const token=await messaging.getToken({vapidKey:'YOUR_VAPID_KEY_HERE'});
+    const token=await messaging.getToken({vapidKey:'BEtoBJywZpECACDNg3KPItIHwdjQSqv649AeAkWFOBQxVEvYdyMXWFhl58kXsZ_kyNvh-KGrUxZYol4VWWAFB_Q'});
     if(token){await db.ref(`users/${user.uid}/fcmTokens/${token}`).set(true);console.log('FCM token saved')}
   }catch(e){console.log('Token error:',e)}
 }
