@@ -1,9 +1,49 @@
 // =============================================
-// BOOKTOK STUDIO — FIREBASE MESSAGING SERVICE WORKER
+// BOOKTOK STUDIO — SERVICE WORKER
+// Bump the version number to force cache refresh
 // =============================================
-// This file MUST be at the root of your site (same level as index.html)
-// Upload to your GitHub repo alongside index.html
-// =============================================
+const CACHE_NAME = 'booktok-v1';
+const ASSETS = [
+  './',
+  './index.html',
+];
+
+// ═══════ CACHE MANAGEMENT ═══════
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+  const url = event.request.url;
+  // Don't cache Firebase/Google API calls
+  if (url.includes('firebaseio.com') || url.includes('googleapis.com') || url.includes('gstatic.com') || url.includes('google.com')) return;
+
+  event.respondWith(
+    fetch(event.request)
+      .then(response => {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        return response;
+      })
+      .catch(() => caches.match(event.request))
+  );
+});
+
+// ═══════ FIREBASE MESSAGING ═══════
 
 importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js');
@@ -28,32 +68,27 @@ messaging.onBackgroundMessage((payload) => {
   const title = notification.title || 'BookTok Studio';
   const options = {
     body: notification.body || '',
-    icon: notification.icon || '/icon-192.png',
-    badge: '/icon-192.png',
+    icon: './icon-192.png',
+    badge: './icon-192.png',
     tag: payload.data?.tag || 'booktok-notification',
     data: payload.data || {},
-    // Vibrate pattern for iPhone
     vibrate: [200, 100, 200],
   };
 
   self.registration.showNotification(title, options);
 });
 
-// Handle notification click — open the app
+// Open app when notification is tapped
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // If app is already open, focus it
       for (const client of clientList) {
         if (client.url && 'focus' in client) {
           return client.focus();
         }
       }
-      // Otherwise open it
-      if (clients.openWindow) {
-        return clients.openWindow('/');
-      }
+      return clients.openWindow('./');
     })
   );
 });
