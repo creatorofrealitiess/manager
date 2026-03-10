@@ -418,7 +418,7 @@ async function saveFcmToken(){
   try{
     if(!messaging){toast('⚠ No messaging');return}
     if(!user){toast('⚠ No user');return}
-    const token=await messaging.getToken({vapidKey:'YOUR_VAPID_KEY_HERE',serviceWorkerRegistration:swRegistration});
+    const token=await messaging.getToken({vapidKey:'BEtoBJywZpECACDNg3KPItIHwdjQSqv649AeAkWFOBQxVEvYdyMXWFhl58kXsZ_kyNvh-KGrUxZYol4VWWAFB_Q',serviceWorkerRegistration:swRegistration});
     if(token){
       await db.ref(`users/${user.uid}/fcmTokens/${token}`).set(true);
       toast('✅ Token saved!');
