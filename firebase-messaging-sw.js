@@ -2,7 +2,7 @@
 // BOOKTOK STUDIO — SERVICE WORKER
 // Bump the version number to force cache refresh
 // =============================================
-const CACHE_NAME = 'booktok-v2';
+const CACHE_NAME = 'booktok-v3';
 const ASSETS = [
   './',
   './index.html',
