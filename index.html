@@ -299,6 +299,48 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:v
 .spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .5s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+/* FOLLOWER TRACKER */
+.acc-foll{display:flex;align-items:center;gap:6px;margin-top:6px}
+.foll-count{font-family:'Fraunces',serif;font-weight:700;font-size:.88rem;color:var(--txt);cursor:pointer;transition:var(--tr);display:flex;align-items:center;gap:4px}
+.foll-count:hover{color:var(--accent)}
+.foll-delta{font-size:.68rem;font-weight:600;padding:1px 6px;border-radius:10px;display:inline-flex;align-items:center;gap:2px}
+.foll-delta.up{background:#edf7f1;color:#2da562}
+.foll-delta.down{background:#fde8e8;color:#dc3545}
+.foll-delta.same{background:var(--bg);color:var(--txt3)}
+.foll-prev{font-size:.68rem;color:var(--txt3);font-weight:500}
+.foll-label{font-size:.68rem;color:var(--txt3);font-weight:500}
+.foll-empty{font-size:.72rem;color:var(--txt3);cursor:pointer;padding:2px 8px;border:1px dashed var(--border);border-radius:var(--r-s);transition:var(--tr)}
+.foll-empty:hover{border-color:var(--accent);color:var(--accent)}
+/* Inline edit (desktop) */
+.foll-inline-edit{display:flex;align-items:center;gap:6px;margin-top:6px}
+.foll-inline-input{width:90px;padding:5px 8px;border:1.5px solid var(--accent);border-radius:var(--r-s);font-family:'DM Sans',sans-serif;font-size:.85rem;color:var(--txt);background:var(--white);outline:none;box-shadow:0 0 0 3px var(--accent-lt)}
+.foll-inline-save,.foll-inline-cancel{padding:5px 10px;border-radius:var(--r-s);border:none;font-family:'DM Sans',sans-serif;font-size:.72rem;font-weight:600;cursor:pointer;transition:var(--tr)}
+.foll-inline-save{background:var(--accent);color:var(--txtW)}
+.foll-inline-save:hover{background:var(--accent-h)}
+.foll-inline-cancel{background:var(--bg);color:var(--txt2)}
+.foll-inline-cancel:hover{background:var(--border)}
+/* Banner follower display */
+.auth-foll-row{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.auth-foll-current{font-family:'Fraunces',serif;font-weight:700;font-size:1.2rem;color:var(--txt);display:flex;align-items:center;gap:6px}
+.auth-foll-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.auth-foll-edit{padding:4px 10px;border-radius:var(--r-s);border:1px solid var(--border);background:var(--white);color:var(--txt2);font-family:'DM Sans',sans-serif;font-size:.7rem;font-weight:600;cursor:pointer;transition:var(--tr)}
+.auth-foll-edit:hover{background:var(--bg);border-color:var(--accent);color:var(--accent)}
+/* Follower modal (mobile) */
+.foll-modal-overlay{position:fixed;inset:0;background:rgba(26,24,21,.4);z-index:200;display:none;align-items:flex-end;justify-content:center}
+.foll-modal-overlay.show{display:flex}
+.foll-modal{width:100%;max-width:500px;background:var(--bg-card);border-radius:var(--r-l) var(--r-l) 0 0;padding:24px 20px 28px;box-shadow:0 -8px 40px rgba(0,0,0,.15);animation:modalUp .25s ease}
+.foll-modal h3{font-family:'Fraunces',serif;font-weight:700;font-size:1.1rem;margin-bottom:6px}
+.foll-modal-sub{font-size:.82rem;color:var(--txt2);margin-bottom:18px}
+.foll-modal-current{display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:10px 14px;background:var(--bg);border-radius:var(--r-s)}
+.foll-modal-current-label{font-size:.72rem;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px}
+.foll-modal-current-val{font-family:'Fraunces',serif;font-weight:700;font-size:1rem;color:var(--txt)}
+.foll-modal-field{margin-bottom:14px}
+.foll-modal-field label{display:block;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--txt3);margin-bottom:6px}
+.foll-modal-field input{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:var(--r-s);font-family:'DM Sans',sans-serif;font-size:1rem;color:var(--txt);background:var(--white);outline:none;transition:var(--tr)}
+.foll-modal-field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-lt)}
+.foll-modal-actions{display:flex;gap:8px;margin-top:18px}
+.foll-modal-actions button{flex:1;padding:13px;border-radius:var(--r-s);font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:600;cursor:pointer;transition:var(--tr);border:none}
+
 @media(max-width:400px){.post-grid{grid-template-columns:repeat(2,1fr)}.cal-day{min-height:60px}}
 </style>
 </head>
@@ -376,6 +418,25 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:v
   </div>
 </div>
 
+<!-- Follower Modal (mobile) -->
+<div class="foll-modal-overlay" id="follModal" onclick="if(event.target===this)closeFollModal()">
+  <div class="foll-modal">
+    <h3 id="follModalTitle">Update Followers</h3>
+    <div class="foll-modal-sub" id="follModalSub"></div>
+    <div class="foll-modal-current" id="follModalCurrent" style="display:none">
+      <div><div class="foll-modal-current-label">Current count</div><div class="foll-modal-current-val" id="follModalCurVal">—</div></div>
+    </div>
+    <div class="foll-modal-field">
+      <label>New Follower Count</label>
+      <input type="number" id="follModalInput" placeholder="e.g. 1247" inputmode="numeric">
+    </div>
+    <div class="foll-modal-actions">
+      <button class="task-modal-cancel" onclick="closeFollModal()">Cancel</button>
+      <button class="task-modal-save" onclick="saveFollModal()">Update</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
@@ -393,39 +454,46 @@ let swRegistration=null;
 
 async function initNotifications(){
   try{
-    if(!('Notification' in window)){toast('⚠ Notifications not supported');return}
-    if(!('serviceWorker' in navigator)){toast('⚠ Service workers not supported');return}
+    if(!('Notification' in window)){console.log('Notifications not supported');return}
+    if(!('serviceWorker' in navigator)){console.log('Service workers not supported');return}
     swRegistration=await navigator.serviceWorker.register('firebase-messaging-sw.js');
     messaging=firebase.messaging();
     if(Notification.permission==='granted'){await saveFcmToken();notificationsEnabled=true;updateNotifBtn()}
+    // Foreground message handler — suppress notification if app is focused
+    // (the SW only fires for background, so this prevents duplicates)
     messaging.onMessage((payload)=>{
       const n=payload.notification||{};
-      if(n.title)toast(n.title+(n.body?': '+n.body:''));
+      const title=n.title||'BookTok Studio';
+      const body=n.body||'';
+      // Show as in-app toast instead of system notification (avoids duplication)
+      if(title||body)toast(title+(body?' — '+body:''));
     });
-  }catch(e){toast('FCM init error: '+e.message);console.log('FCM init error:',e)}
+  }catch(e){console.log('FCM init error:',e)}
 }
 
 async function requestNotifPermission(){
   try{
-    if(!messaging)return toast('Notifications not available — messaging not initialized');
+    if(!messaging)return toast('Notifications not available');
     const perm=await Notification.requestPermission();
     if(perm==='granted'){await saveFcmToken();notificationsEnabled=true;toast('Notifications enabled!');updateNotifBtn()}
-    else{toast('Permission denied: '+perm)}
+    else{toast('Notification permission denied')}
   }catch(e){toast('Permission error: '+e.message)}
 }
 
 async function saveFcmToken(){
   try{
-    if(!messaging){toast('⚠ No messaging');return}
-    if(!user){toast('⚠ No user');return}
+    if(!messaging){return}
+    if(!user){return}
     const token=await messaging.getToken({vapidKey:'BEtoBJywZpECACDNg3KPItIHwdjQSqv649AeAkWFOBQxVEvYdyMXWFhl58kXsZ_kyNvh-KGrUxZYol4VWWAFB_Q',serviceWorkerRegistration:swRegistration});
     if(token){
-      await db.ref(`users/${user.uid}/fcmTokens/${token}`).set(true);
-      toast('✅ Token saved!');
-    }else{
-      toast('⚠ No token returned');
+      // Check if token already saved to avoid duplicate writes and toasts
+      const snap=await db.ref(`users/${user.uid}/fcmTokens/${token}`).once('value');
+      if(!snap.exists()){
+        await db.ref(`users/${user.uid}/fcmTokens/${token}`).set(true);
+        console.log('[FCM] New token saved');
+      }
     }
-  }catch(e){toast('Token error: '+e.message);console.log('Token error:',e)}
+  }catch(e){console.log('Token error:',e)}
 }
 
 function updateNotifBtn(){
@@ -449,7 +517,7 @@ const HTAGS=['#arrangedmarriage','#agegapromance','#enemiestolovers','#stalkerro
 const TASK_CATS=['Batch','Draft','Post'];
 const PROJ_KEYS=['RE','DK','PV'];
 
-let user=null,isSignUp=false,curTab='accounts',curAuthor=null,curPostId=null,curFilter='all',postsCache={},allPosts={},edImgs=[],selStatus='draft',calMo=new Date().getMonth(),calYr=new Date().getFullYear(),calFilt='all',navStack=[],profilePics={},openCats={},openSubs={};
+let user=null,isSignUp=false,curTab='accounts',curAuthor=null,curPostId=null,curFilter='all',postsCache={},allPosts={},edImgs=[],selStatus='draft',calMo=new Date().getMonth(),calYr=new Date().getFullYear(),calFilt='all',navStack=[],profilePics={},openCats={},openSubs={},followers={},follEditAuthor=null;
 
 // AUTH
 function togAuth(){isSignUp=!isSignUp;document.getElementById('authBtn').textContent=isSignUp?'Create Account':'Sign In';document.getElementById('authSw').innerHTML=isSignUp?'Have an account? <a onclick="togAuth()">Sign in</a>':'No account? <a onclick="togAuth()">Create one</a>';document.getElementById('authErr').textContent=''}
@@ -457,7 +525,7 @@ async function handleAuth(){const e=document.getElementById('authEmail').value.t
 au.onAuthStateChanged(u=>{if(u){user=u;document.getElementById('authScreen').style.display='none';document.getElementById('app').classList.add('active');loadAll();swTab('accounts');initNotifications()}else{user=null;document.getElementById('authScreen').style.display='flex';document.getElementById('app').classList.remove('active');document.getElementById('authBtn').textContent=isSignUp?'Create Account':'Sign In';document.getElementById('authBtn').disabled=false}});
 function signOut(){au.signOut()}
 
-function loadAll(){if(!user)return;db.ref(`users/${user.uid}/posts`).on('value',s=>{allPosts=s.val()||{};if(curTab==='calendar')renderCal();if(curTab==='accounts')renderAcc();if(curAuthor)renderAuthorPosts()});db.ref(`users/${user.uid}/profilePics`).on('value',s=>{profilePics=s.val()||{};if(curTab==='accounts')renderAcc()});loadTasks()}
+function loadAll(){if(!user)return;db.ref(`users/${user.uid}/posts`).on('value',s=>{allPosts=s.val()||{};if(curTab==='calendar')renderCal();if(curTab==='accounts')renderAcc();if(curAuthor)renderAuthorPosts()});db.ref(`users/${user.uid}/profilePics`).on('value',s=>{profilePics=s.val()||{};if(curTab==='accounts')renderAcc()});db.ref(`users/${user.uid}/followers`).on('value',s=>{followers=s.val()||{};if(curTab==='accounts')renderAcc()});loadTasks()}
 
 // TABS
 function swTab(t){curTab=t;curAuthor=null;curPostId=null;navStack=[];document.querySelectorAll('.page,.ed-page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab-i').forEach((x,i)=>x.classList.toggle('active',['accounts','calendar','tasks','taskcal'][i]===t));document.getElementById('navBack').style.display='none';document.getElementById('navBrand').style.display='block';document.getElementById('navTitle').style.display='none';document.getElementById('fab').classList.remove('show');document.getElementById('btabs').style.display='flex';if(t==='accounts'){document.getElementById('pgAcc').classList.add('active');renderAcc()}else if(t==='calendar'){document.getElementById('pgCal').classList.add('active');renderCal()}else if(t==='tasks'){document.getElementById('pgTask').classList.add('active');renderTasks()}else if(t==='taskcal'){document.getElementById('pgTaskCal').classList.add('active');renderTaskCal()}}
@@ -470,7 +538,7 @@ function goBack(){navStack.pop();const prev=navStack[navStack.length-1];if(prev=
 function newPost(){showEd(null)}
 
 // ACCOUNTS
-function renderAcc(){const el=document.getElementById('pgAcc');const grp={};AUTHORS.forEach(a=>{if(!grp[a.project])grp[a.project]=[];grp[a.project].push(a)});let h=`<div class="sec-hd"><div><div class="sec-t">Accounts</div><div class="sec-st">7 BookTok accounts</div></div></div>`;for(const[proj,auths]of Object.entries(grp)){h+=`<div class="acc-grp"><div class="grp-lb"><div class="grp-dot" style="background:${PROJ[proj].color}"></div><div class="grp-nm">${PROJ[proj].name}</div></div><div class="acc-list">`;for(const a of auths){const ps=allPosts[a.id]||{};let d=0,r=0,p=0;Object.values(ps).forEach(x=>{if(x.status==='draft')d++;else if(x.status==='ready')r++;else if(x.status==='posted')p++});const pic=profilePics[a.id];h+=`<div class="acc-card" onclick="showAuth2('${a.id}')"><div class="acc-av" style="background:${PROJ[a.project].color}">${pic?`<img src="${pic}" alt="">`:`${a.init}`}</div><div class="acc-info"><div class="acc-handle">${a.handle}</div><div class="acc-counts"><span class="cnt-pill draft">${d} draft${d!==1?'s':''}</span><span class="cnt-pill ready">${r} ready</span>${p?`<span class="cnt-pill posted">${p} posted</span>`:''}</div></div><div class="acc-arrow">&#8250;</div></div>`}h+='</div></div>'}el.innerHTML=h}
+function renderAcc(){const el=document.getElementById('pgAcc');const grp={};AUTHORS.forEach(a=>{if(!grp[a.project])grp[a.project]=[];grp[a.project].push(a)});let h=`<div class="sec-hd"><div><div class="sec-t">Accounts</div><div class="sec-st">7 BookTok accounts</div></div></div>`;for(const[proj,auths]of Object.entries(grp)){h+=`<div class="acc-grp"><div class="grp-lb"><div class="grp-dot" style="background:${PROJ[proj].color}"></div><div class="grp-nm">${PROJ[proj].name}</div></div><div class="acc-list">`;for(const a of auths){const ps=allPosts[a.id]||{};let d=0,r=0,p=0;Object.values(ps).forEach(x=>{if(x.status==='draft')d++;else if(x.status==='ready')r++;else if(x.status==='posted')p++});const pic=profilePics[a.id];const f=followers[a.id];const follH=followerCardH(a.id,f);h+=`<div class="acc-card" onclick="showAuth2('${a.id}')"><div class="acc-av" style="background:${PROJ[a.project].color}">${pic?`<img src="${pic}" alt="">`:`${a.init}`}</div><div class="acc-info"><div class="acc-handle">${a.handle}</div><div class="acc-counts"><span class="cnt-pill draft">${d} draft${d!==1?'s':''}</span><span class="cnt-pill ready">${r} ready</span>${p?`<span class="cnt-pill posted">${p} posted</span>`:''}</div>${follH}</div><div class="acc-arrow">&#8250;</div></div>`}h+='</div></div>'}el.innerHTML=h}
 
 async function uploadPfp(aid,file){if(!file||!user)return;const url=await toDataUrl(file);await db.ref(`users/${user.uid}/profilePics/${aid}`).set(url);toast('Profile pic updated!')}
 
@@ -494,7 +562,32 @@ function setCF(f){calFilt=f;renderCal()}
 
 // TASKS
 let tasks=[];
-function loadTasks(){if(!user)return;db.ref(`users/${user.uid}/tasks2`).on('value',s=>{tasks=Object.entries(s.val()||{}).map(([id,t])=>({id,...t}));if(curTab==='tasks')renderTasks();if(curTab==='taskcal')renderTaskCal()})}
+let overdueNotified={};
+function loadTasks(){if(!user)return;db.ref(`users/${user.uid}/tasks2`).on('value',s=>{tasks=Object.entries(s.val()||{}).map(([id,t])=>({id,...t}));if(curTab==='tasks')renderTasks();if(curTab==='taskcal')renderTaskCal();checkOverdueTasks()})}
+
+function checkOverdueTasks(){
+  if(!notificationsEnabled||!tasks.length)return;
+  const todayStr=getLocalDateStr();
+  const overdue=tasks.filter(t=>!t.done&&!t.archived&&t.dueDate&&t.dueDate<todayStr);
+  if(!overdue.length)return;
+  // Only notify once per session per batch of overdue tasks
+  const overdueKey=overdue.map(t=>t.id).sort().join(',');
+  if(overdueNotified[overdueKey])return;
+  overdueNotified[overdueKey]=true;
+  // Show in-app toast for overdue count
+  const count=overdue.length;
+  toast(`&#9888;&#65039; ${count} overdue task${count!==1?'s':''}!`);
+  // Also show system notification if permission granted and app not focused
+  if(Notification.permission==='granted'&&document.hidden){
+    const names=overdue.slice(0,3).map(t=>t.text).join(', ');
+    const more=count>3?` and ${count-3} more`:'';
+    new Notification('BookTok Studio — Overdue Tasks',{
+      body:`${count} task${count!==1?'s':''} overdue: ${names}${more}`,
+      icon:'./icon-192.png',
+      tag:'overdue-tasks-'+todayStr
+    });
+  }
+}
 
 function getLocalDateStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function renderTasks(){const el=document.getElementById('pgTask');const todayStr=getLocalDateStr();
@@ -579,8 +672,8 @@ function togSub2(key,hd){openSubs[key]=!openSubs[key];hd.classList.toggle('open'
 function togCompleted(hd){hd.nextElementSibling.classList.toggle('open')}
 
 // AUTHOR VIEW
-function renderAuthView(){const el=document.getElementById('pgAuth');const a=curAuthor;const pic=profilePics[a.id];
-el.innerHTML=`<div class="auth-banner"><div style="position:relative;cursor:pointer" onclick="document.getElementById('pfpInput').click()"><div class="auth-big-av" style="background:${PROJ[a.project].color}">${pic?`<img src="${pic}" alt="">`:`${a.init}`}</div><input type="file" id="pfpInput" accept="image/*" style="position:absolute;opacity:0;width:0;height:0" onchange="uploadPfp('${a.id}',this.files[0])"></div><div class="auth-b-info"><h2>${a.handle}</h2><p>${PROJ[a.project].name}</p></div></div><div class="filt-row">${['all','draft','ready','posted'].map(f=>`<div class="filt-p ${curFilter===f?'active':''}" onclick="setFilt('${f}')">${f==='all'?'All':f[0].toUpperCase()+f.slice(1)}</div>`).join('')}</div><div class="post-grid" id="postGrid"><div style="text-align:center;padding:30px;grid-column:1/-1"><span class="spinner"></span></div></div>`;renderAuthorPosts()}
+function renderAuthView(){const el=document.getElementById('pgAuth');const a=curAuthor;const pic=profilePics[a.id];const f=followers[a.id];const follBannerH=followerBannerH(a.id,f);
+el.innerHTML=`<div class="auth-banner"><div style="position:relative;cursor:pointer" onclick="document.getElementById('pfpInput').click()"><div class="auth-big-av" style="background:${PROJ[a.project].color}">${pic?`<img src="${pic}" alt="">`:`${a.init}`}</div><input type="file" id="pfpInput" accept="image/*" style="position:absolute;opacity:0;width:0;height:0" onchange="uploadPfp('${a.id}',this.files[0])"></div><div class="auth-b-info"><h2>${a.handle}</h2><p>${PROJ[a.project].name}</p>${follBannerH}</div></div><div class="filt-row">${['all','draft','ready','posted'].map(f=>`<div class="filt-p ${curFilter===f?'active':''}" onclick="setFilt('${f}')">${f==='all'?'All':f[0].toUpperCase()+f.slice(1)}</div>`).join('')}</div><div class="post-grid" id="postGrid"><div style="text-align:center;padding:30px;grid-column:1/-1"><span class="spinner"></span></div></div>`;renderAuthorPosts()}
 function setFilt(f){curFilter=f;renderAuthView()}
 
 function renderAuthorPosts(){const g=document.getElementById('postGrid');if(!g||!curAuthor)return;const data=allPosts[curAuthor.id]||{};postsCache=data;const posts=Object.entries(data).map(([id,p])=>({id,...p})).filter(p=>curFilter==='all'||p.status===curFilter).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
@@ -616,6 +709,117 @@ function cpF(id,btn){const el=document.getElementById(id);if(!el)return;navigato
 function cpAll(){const h=document.getElementById('hookI')?.value||'',s=document.getElementById('slideI')?.value||'',c=document.getElementById('capI')?.value||'',t=document.getElementById('tagI')?.value||'';navigator.clipboard.writeText([h,s,c,t].filter(Boolean).join('\n\n')).then(()=>toast('Copied all fields'))}
 async function savePost(){if(!user||!curAuthor)return;const d={hook:document.getElementById('hookI')?.value||'',slideshowTitle:document.getElementById('slideI')?.value||'',caption:document.getElementById('capI')?.value||'',hashtags:document.getElementById('tagI')?.value||'',scheduledDate:document.getElementById('schD')?.value||'',scheduledTime:document.getElementById('schT')?.value||'',status:selStatus,notes:document.getElementById('notI')?.value||'',context:document.getElementById('ctxI')?.value||'',images:edImgs,updatedAt:Date.now()};const pid=curPostId||db.ref().push().key;try{await db.ref(`users/${user.uid}/posts/${curAuthor.id}/${pid}`).set(d);postsCache[pid]=d;curPostId=pid;toast('Saved!');goBack()}catch(e){toast('Error: '+e.message)}}
 async function delPost(){if(!user||!curAuthor||!curPostId)return;if(!confirm('Delete this post?'))return;try{await db.ref(`users/${user.uid}/posts/${curAuthor.id}/${curPostId}`).remove();delete postsCache[curPostId];toast('Deleted');goBack()}catch(e){toast('Error: '+e.message)}}
+
+// =============================================
+// FOLLOWER TRACKER
+// =============================================
+function fmtNum(n){if(n===null||n===undefined)return '—';if(n>=1000000)return (n/1000000).toFixed(1).replace(/\.0$/,'')+'M';if(n>=10000)return (n/1000).toFixed(1).replace(/\.0$/,'')+'K';return n.toLocaleString()}
+
+function followerCardH(aid,f){
+  if(!f||f.current===undefined||f.current===null){
+    return `<div class="acc-foll"><span class="foll-empty" onclick="event.stopPropagation();openFollEdit('${aid}')">+ Add followers</span></div>`;
+  }
+  const cur=f.current;const prev=f.previous;
+  let deltaH='';
+  if(prev!==undefined&&prev!==null){
+    const diff=cur-prev;
+    if(diff>0)deltaH=`<span class="foll-delta up">&#9650; +${fmtNum(diff)}</span>`;
+    else if(diff<0)deltaH=`<span class="foll-delta down">&#9660; ${fmtNum(diff)}</span>`;
+    else deltaH=`<span class="foll-delta same">=</span>`;
+  }
+  return `<div class="acc-foll" onclick="event.stopPropagation();openFollEdit('${aid}')"><span class="foll-label">&#128101;</span><span class="foll-count">${fmtNum(cur)}${deltaH}</span>${prev!==undefined&&prev!==null?`<span class="foll-prev">from ${fmtNum(prev)}</span>`:''}</div>`;
+}
+
+function followerBannerH(aid,f){
+  if(!f||f.current===undefined||f.current===null){
+    return `<div class="auth-foll-row"><span class="foll-empty" onclick="openFollEdit('${aid}')" style="font-size:.8rem;padding:4px 12px">+ Track followers</span></div>`;
+  }
+  const cur=f.current;const prev=f.previous;
+  let deltaH='';
+  if(prev!==undefined&&prev!==null){
+    const diff=cur-prev;
+    if(diff>0)deltaH=`<span class="foll-delta up" style="font-size:.75rem">&#9650; +${fmtNum(diff)}</span>`;
+    else if(diff<0)deltaH=`<span class="foll-delta down" style="font-size:.75rem">&#9660; ${fmtNum(diff)}</span>`;
+    else deltaH=`<span class="foll-delta same" style="font-size:.75rem">=</span>`;
+  }
+  const prevH=prev!==undefined&&prev!==null?`<span class="foll-prev" style="font-size:.75rem">prev ${fmtNum(prev)}</span>`:'';
+  const updH=f.updatedAt?`<span class="foll-prev" style="font-size:.68rem">&#183; ${timeAgo(f.updatedAt)}</span>`:'';
+  return `<div class="auth-foll-row"><div class="auth-foll-current">&#128101; ${fmtNum(cur)} ${deltaH}</div><div class="auth-foll-meta">${prevH}${updH}<button class="auth-foll-edit" onclick="openFollEdit('${aid}')">Update</button></div></div>`;
+}
+
+function timeAgo(ts){const s=Math.floor((Date.now()-ts)/1000);if(s<60)return 'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';const d=Math.floor(s/86400);if(d===1)return 'yesterday';if(d<30)return d+'d ago';return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+
+function isMobile(){return window.innerWidth<=600||'ontouchstart' in window}
+
+function openFollEdit(aid){
+  follEditAuthor=aid;
+  const a=AUTHORS.find(x=>x.id===aid);
+  const f=followers[aid];
+  if(isMobile()){
+    // Mobile: modal
+    document.getElementById('follModalTitle').textContent=`Update Followers`;
+    document.getElementById('follModalSub').textContent=a?a.handle:'';
+    if(f&&f.current!==undefined&&f.current!==null){
+      document.getElementById('follModalCurrent').style.display='flex';
+      document.getElementById('follModalCurVal').textContent=fmtNum(f.current);
+    }else{
+      document.getElementById('follModalCurrent').style.display='none';
+    }
+    document.getElementById('follModalInput').value='';
+    document.getElementById('follModal').classList.add('show');
+    setTimeout(()=>document.getElementById('follModalInput').focus(),150);
+  }else{
+    // Desktop: inline edit — replace the follower display on the account card
+    const follEls=document.querySelectorAll('.acc-foll, .auth-foll-row');
+    follEls.forEach(el=>{
+      // Find the one belonging to this author by checking onclick attributes
+      if(el.innerHTML.includes(aid)){
+        const curVal=f&&f.current!==undefined?f.current:'';
+        el.innerHTML=`<div class="foll-inline-edit"><input class="foll-inline-input" type="number" inputmode="numeric" value="" placeholder="${curVal||'Count'}" id="follInline_${aid}" onkeydown="if(event.key==='Enter')saveFollInline('${aid}');if(event.key==='Escape')cancelFollInline()"><button class="foll-inline-save" onclick="event.stopPropagation();saveFollInline('${aid}')">Save</button><button class="foll-inline-cancel" onclick="event.stopPropagation();cancelFollInline()">Cancel</button></div>`;
+        el.onclick=e=>e.stopPropagation();
+        setTimeout(()=>{const inp=document.getElementById('follInline_'+aid);if(inp)inp.focus()},50);
+      }
+    });
+  }
+}
+
+function closeFollModal(){document.getElementById('follModal').classList.remove('show');follEditAuthor=null}
+
+async function saveFollModal(){
+  const input=document.getElementById('follModalInput');
+  const val=parseInt(input.value);
+  if(isNaN(val)||val<0){toast('Please enter a valid number');return}
+  await saveFollowerCount(follEditAuthor,val);
+  closeFollModal();
+}
+
+async function saveFollInline(aid){
+  const inp=document.getElementById('follInline_'+aid);
+  if(!inp)return;
+  const val=parseInt(inp.value);
+  if(isNaN(val)||val<0){toast('Please enter a valid number');return}
+  await saveFollowerCount(aid,val);
+}
+
+function cancelFollInline(){
+  // Re-render to restore display
+  if(curAuthor)renderAuthView();
+  else renderAcc();
+}
+
+async function saveFollowerCount(aid,newCount){
+  if(!user||!aid)return;
+  const f=followers[aid];
+  const data={
+    current:newCount,
+    previous:f&&f.current!==undefined?f.current:null,
+    updatedAt:Date.now()
+  };
+  try{
+    await db.ref(`users/${user.uid}/followers/${aid}`).set(data);
+    toast('Followers updated!');
+  }catch(e){toast('Error: '+e.message)}
+}
 
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}

@@ -66,11 +66,13 @@ messaging.onBackgroundMessage((payload) => {
 
   const notification = payload.notification || {};
   const title = notification.title || 'BookTok Studio';
+  const tag = payload.data?.tag || 'booktok-' + Date.now();
   const options = {
     body: notification.body || '',
     icon: './icon-192.png',
     badge: './icon-192.png',
-    tag: payload.data?.tag || 'booktok-notification',
+    tag: tag,  // Use unique tag to prevent duplicates
+    renotify: false,  // Don't re-alert for same tag
     data: payload.data || {},
     vibrate: [200, 100, 200],
   };
