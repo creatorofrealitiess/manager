@@ -526,9 +526,20 @@ function togAuth(){isSignUp=!isSignUp;document.getElementById('authBtn').textCon
 async function handleAuth(){const e=document.getElementById('authEmail').value.trim(),p=document.getElementById('authPass').value,er=document.getElementById('authErr'),b=document.getElementById('authBtn');if(!e||!p){er.textContent='Please fill in all fields';return}b.innerHTML='<span class="spinner"></span>';b.disabled=true;try{if(isSignUp)await au.createUserWithEmailAndPassword(e,p);else await au.signInWithEmailAndPassword(e,p);try{localStorage.setItem('btk_e',btoa(e));localStorage.setItem('btk_p',btoa(p))}catch(x){}}catch(x){const m={'auth/wrong-password':'Invalid email or password','auth/user-not-found':'Invalid email or password','auth/invalid-credential':'Invalid email or password','auth/email-already-in-use':'Email already registered','auth/weak-password':'Password must be at least 6 characters','auth/invalid-email':'Invalid email address'};er.textContent=m[x.code]||'Something went wrong';b.textContent=isSignUp?'Create Account':'Sign In';b.disabled=false}}
 let autoLoginAttempted=false;
 au.onAuthStateChanged(async u=>{if(u){user=u;document.getElementById('authScreen').style.display='none';document.getElementById('app').classList.add('active');loadAll();swTab('accounts');initNotifications()}else if(!autoLoginAttempted){autoLoginAttempted=true;try{const e=localStorage.getItem('btk_e'),p=localStorage.getItem('btk_p');if(e&&p){await au.signInWithEmailAndPassword(atob(e),atob(p));return}}catch(x){console.log('Auto-login failed:',x.code)}user=null;document.getElementById('authScreen').style.display='flex';document.getElementById('app').classList.remove('active');document.getElementById('authBtn').textContent=isSignUp?'Create Account':'Sign In';document.getElementById('authBtn').disabled=false}else{user=null;document.getElementById('authScreen').style.display='flex';document.getElementById('app').classList.remove('active');document.getElementById('authBtn').textContent=isSignUp?'Create Account':'Sign In';document.getElementById('authBtn').disabled=false}});
-function signOut(){try{localStorage.removeItem('btk_e');localStorage.removeItem('btk_p')}catch(x){}au.signOut()}
+function signOut(){try{localStorage.removeItem('btk_e');localStorage.removeItem('btk_p');localStorage.removeItem('btk_posts');localStorage.removeItem('btk_pics');localStorage.removeItem('btk_foll');localStorage.removeItem('btk_tasks')}catch(x){}au.signOut()}
 
-function loadAll(){if(!user)return;db.ref(`users/${user.uid}/posts`).on('value',s=>{allPosts=s.val()||{};if(curTab==='calendar')renderCal();if(curTab==='accounts')renderAcc();if(curAuthor)renderAuthorPosts()});db.ref(`users/${user.uid}/profilePics`).on('value',s=>{profilePics=s.val()||{};if(curTab==='accounts')renderAcc()});db.ref(`users/${user.uid}/followers`).on('value',s=>{followers=s.val()||{};if(curTab==='accounts')renderAcc()});loadTasks()}
+// Cache helpers — save to localStorage on every update, restore on load
+function cacheSet(k,v){try{localStorage.setItem('btk_'+k,JSON.stringify(v))}catch(x){}}
+function cacheGet(k){try{const v=localStorage.getItem('btk_'+k);return v?JSON.parse(v):null}catch(x){return null}}
+
+function loadAll(){if(!user)return;
+// Restore cached data immediately for instant render
+const cachedPosts=cacheGet('posts');if(cachedPosts){allPosts=cachedPosts;if(curTab==='calendar')renderCal();if(curTab==='accounts')renderAcc()}
+const cachedPics=cacheGet('pics');if(cachedPics){profilePics=cachedPics;if(curTab==='accounts')renderAcc()}
+const cachedFoll=cacheGet('foll');if(cachedFoll){followers=cachedFoll;if(curTab==='accounts')renderAcc()}
+const cachedTasks=cacheGet('tasks');if(cachedTasks){tasks=cachedTasks.map(t=>({...t}));if(curTab==='tasks')renderTasks();if(curTab==='taskcal')renderTaskCal()}
+// Then set up live listeners that update cache + UI
+db.ref(`users/${user.uid}/posts`).on('value',s=>{allPosts=s.val()||{};cacheSet('posts',allPosts);if(curTab==='calendar')renderCal();if(curTab==='accounts')renderAcc();if(curAuthor)renderAuthorPosts()});db.ref(`users/${user.uid}/profilePics`).on('value',s=>{profilePics=s.val()||{};cacheSet('pics',profilePics);if(curTab==='accounts')renderAcc()});db.ref(`users/${user.uid}/followers`).on('value',s=>{followers=s.val()||{};cacheSet('foll',followers);if(curTab==='accounts')renderAcc()});loadTasks()}
 
 // TABS
 function swTab(t){curTab=t;curAuthor=null;curPostId=null;navStack=[];document.querySelectorAll('.page,.ed-page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab-i').forEach((x,i)=>x.classList.toggle('active',['accounts','calendar','tasks','taskcal'][i]===t));document.getElementById('navBack').style.display='none';document.getElementById('navBrand').style.display='block';document.getElementById('navTitle').style.display='none';document.getElementById('fab').classList.remove('show');document.getElementById('btabs').style.display='flex';if(t==='accounts'){document.getElementById('pgAcc').classList.add('active');renderAcc()}else if(t==='calendar'){document.getElementById('pgCal').classList.add('active');renderCal()}else if(t==='tasks'){document.getElementById('pgTask').classList.add('active');renderTasks()}else if(t==='taskcal'){document.getElementById('pgTaskCal').classList.add('active');renderTaskCal()}}
@@ -566,7 +577,7 @@ function setCF(f){calFilt=f;renderCal()}
 // TASKS
 let tasks=[];
 let overdueNotified={};
-function loadTasks(){if(!user)return;db.ref(`users/${user.uid}/tasks2`).on('value',s=>{tasks=Object.entries(s.val()||{}).map(([id,t])=>({id,...t}));if(curTab==='tasks')renderTasks();if(curTab==='taskcal')renderTaskCal();checkOverdueTasks()})}
+function loadTasks(){if(!user)return;db.ref(`users/${user.uid}/tasks2`).on('value',s=>{tasks=Object.entries(s.val()||{}).map(([id,t])=>({id,...t}));cacheSet('tasks',tasks);if(curTab==='tasks')renderTasks();if(curTab==='taskcal')renderTaskCal();checkOverdueTasks()})}
 
 function checkOverdueTasks(){
   if(!notificationsEnabled||!tasks.length)return;
