@@ -32,14 +32,17 @@ self.addEventListener('fetch', event => {
   // Don't cache Firebase/Google API calls
   if (url.includes('firebaseio.com') || url.includes('googleapis.com') || url.includes('gstatic.com') || url.includes('google.com')) return;
 
+  // Stale-while-revalidate: serve from cache immediately, update in background
   event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        return response;
+    caches.open(CACHE_NAME).then(cache =>
+      cache.match(event.request).then(cached => {
+        const fetchPromise = fetch(event.request).then(response => {
+          cache.put(event.request, response.clone());
+          return response;
+        }).catch(() => cached);
+        return cached || fetchPromise;
       })
-      .catch(() => caches.match(event.request))
+    )
   );
 });
 
@@ -60,20 +63,20 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Handle background messages (when app is not in focus)
+// Handle background messages (data-only — no notification payload)
 messaging.onBackgroundMessage((payload) => {
   console.log('[SW] Background message:', payload);
 
-  const notification = payload.notification || {};
-  const title = notification.title || 'BookTok Studio';
-  const tag = payload.data?.tag || 'booktok-' + Date.now();
+  const data = payload.data || {};
+  const title = data.title || 'BookTok Studio';
+  const tag = data.tag || 'booktok-' + Date.now();
   const options = {
-    body: notification.body || '',
+    body: data.body || '',
     icon: './icon-192.png',
     badge: './icon-192.png',
-    tag: tag,  // Use unique tag to prevent duplicates
-    renotify: false,  // Don't re-alert for same tag
-    data: payload.data || {},
+    tag: tag,
+    renotify: false,
+    data: data,
     vibrate: [200, 100, 200],
   };
 
