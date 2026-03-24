@@ -26,7 +26,7 @@
 body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 
 /* AUTH */
-.auth-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:1000}
+.auth-screen{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:var(--bg);z-index:1000}
 .auth-box{width:90%;max-width:380px;animation:su .5s ease}
 @keyframes su{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
 .auth-brand{text-align:center;margin-bottom:36px}
@@ -446,8 +446,6 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:v
 <script>
 firebase.initializeApp({apiKey:"AIzaSyDMsL5kyKDSVakihwvgrgtOqFlVObDehpw",authDomain:"booktok-46e7a.firebaseapp.com",databaseURL:"https://booktok-46e7a-default-rtdb.firebaseio.com",projectId:"booktok-46e7a",storageBucket:"booktok-46e7a.firebasestorage.app",messagingSenderId:"749806717436",appId:"1:749806717436:web:672e38f0bc13532fb74a79"});
 const au=firebase.auth(),db=firebase.database();
-// Persist auth across sessions (fixes iOS PWA sign-out issue)
-au.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
 // =============================================
 // PUSH NOTIFICATIONS (FCM)
@@ -525,9 +523,10 @@ let user=null,isSignUp=false,curTab='accounts',curAuthor=null,curPostId=null,cur
 
 // AUTH
 function togAuth(){isSignUp=!isSignUp;document.getElementById('authBtn').textContent=isSignUp?'Create Account':'Sign In';document.getElementById('authSw').innerHTML=isSignUp?'Have an account? <a onclick="togAuth()">Sign in</a>':'No account? <a onclick="togAuth()">Create one</a>';document.getElementById('authErr').textContent=''}
-async function handleAuth(){const e=document.getElementById('authEmail').value.trim(),p=document.getElementById('authPass').value,er=document.getElementById('authErr'),b=document.getElementById('authBtn');if(!e||!p){er.textContent='Please fill in all fields';return}b.innerHTML='<span class="spinner"></span>';b.disabled=true;try{if(isSignUp)await au.createUserWithEmailAndPassword(e,p);else await au.signInWithEmailAndPassword(e,p)}catch(x){const m={'auth/wrong-password':'Invalid email or password','auth/user-not-found':'Invalid email or password','auth/invalid-credential':'Invalid email or password','auth/email-already-in-use':'Email already registered','auth/weak-password':'Password must be at least 6 characters','auth/invalid-email':'Invalid email address'};er.textContent=m[x.code]||'Something went wrong';b.textContent=isSignUp?'Create Account':'Sign In';b.disabled=false}}
-au.onAuthStateChanged(u=>{if(u){user=u;document.getElementById('authScreen').style.display='none';document.getElementById('app').classList.add('active');loadAll();swTab('accounts');initNotifications()}else{user=null;document.getElementById('authScreen').style.display='flex';document.getElementById('app').classList.remove('active');document.getElementById('authBtn').textContent=isSignUp?'Create Account':'Sign In';document.getElementById('authBtn').disabled=false}});
-function signOut(){au.signOut()}
+async function handleAuth(){const e=document.getElementById('authEmail').value.trim(),p=document.getElementById('authPass').value,er=document.getElementById('authErr'),b=document.getElementById('authBtn');if(!e||!p){er.textContent='Please fill in all fields';return}b.innerHTML='<span class="spinner"></span>';b.disabled=true;try{if(isSignUp)await au.createUserWithEmailAndPassword(e,p);else await au.signInWithEmailAndPassword(e,p);try{localStorage.setItem('btk_e',btoa(e));localStorage.setItem('btk_p',btoa(p))}catch(x){}}catch(x){const m={'auth/wrong-password':'Invalid email or password','auth/user-not-found':'Invalid email or password','auth/invalid-credential':'Invalid email or password','auth/email-already-in-use':'Email already registered','auth/weak-password':'Password must be at least 6 characters','auth/invalid-email':'Invalid email address'};er.textContent=m[x.code]||'Something went wrong';b.textContent=isSignUp?'Create Account':'Sign In';b.disabled=false}}
+let autoLoginAttempted=false;
+au.onAuthStateChanged(async u=>{if(u){user=u;document.getElementById('authScreen').style.display='none';document.getElementById('app').classList.add('active');loadAll();swTab('accounts');initNotifications()}else if(!autoLoginAttempted){autoLoginAttempted=true;try{const e=localStorage.getItem('btk_e'),p=localStorage.getItem('btk_p');if(e&&p){await au.signInWithEmailAndPassword(atob(e),atob(p));return}}catch(x){console.log('Auto-login failed:',x.code)}user=null;document.getElementById('authScreen').style.display='flex';document.getElementById('app').classList.remove('active');document.getElementById('authBtn').textContent=isSignUp?'Create Account':'Sign In';document.getElementById('authBtn').disabled=false}else{user=null;document.getElementById('authScreen').style.display='flex';document.getElementById('app').classList.remove('active');document.getElementById('authBtn').textContent=isSignUp?'Create Account':'Sign In';document.getElementById('authBtn').disabled=false}});
+function signOut(){try{localStorage.removeItem('btk_e');localStorage.removeItem('btk_p')}catch(x){}au.signOut()}
 
 function loadAll(){if(!user)return;db.ref(`users/${user.uid}/posts`).on('value',s=>{allPosts=s.val()||{};if(curTab==='calendar')renderCal();if(curTab==='accounts')renderAcc();if(curAuthor)renderAuthorPosts()});db.ref(`users/${user.uid}/profilePics`).on('value',s=>{profilePics=s.val()||{};if(curTab==='accounts')renderAcc()});db.ref(`users/${user.uid}/followers`).on('value',s=>{followers=s.val()||{};if(curTab==='accounts')renderAcc()});loadTasks()}
 
