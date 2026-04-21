@@ -402,7 +402,7 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:v
     <div class="task-modal-row">
       <div class="task-modal-field">
         <label>Category</label>
-        <select id="tmCat"><option value="Batch">Batch</option><option value="Draft">Draft</option><option value="Post">Post</option></select>
+        <select id="tmCat"><option value="Batch">Batch</option><option value="Post">Post</option></select>
       </div>
       <div class="task-modal-field">
         <label>Project</label>
@@ -517,7 +517,7 @@ const AUTHORS=[
 ];
 const PROJ={RE:{name:'Project RE',color:'#e85d3a'},DK:{name:'Project DK',color:'#6366f1'},PV:{name:'Project PV',color:'#d946a8'}};
 const HTAGS=['#arrangedmarriage','#agegapromance','#enemiestolovers','#stalkerromance','#hockeyromance','#sportsromance','#mafiaromance','#billionaireromance','#brothersbestfriend','#enemiestoloversrecs','#bratvaromance','#forcedproximitybookrecs','#grumpysunshineromance','#bookboyfriend','#booktokbooks','#booktok','#bookish','#bookrecommendations','#booklover','#bookworm','#darkromance','#spicybooks','#romancebooks','#booktokfyp','#bookseries','#mustread','#bookobsessed','#morallygrey','#possessivehero','#forcedproximity','#bookstoread','#5starread','#bookclub','#fantasyromance','#romantasy'];
-const TASK_CATS=['Batch','Draft','Post'];
+const TASK_CATS=['Batch','Post'];
 const PROJ_KEYS=['RE','DK','PV'];
 
 let user=null,isSignUp=false,curTab='accounts',curAuthor=null,curPostId=null,curFilter='draft',postsCache={},allPosts={},edImgs=[],selStatus='draft',calMo=new Date().getMonth(),calYr=new Date().getFullYear(),calFilt='all',navStack=[],profilePics={},openCats={},openSubs={},followers={},follEditAuthor=null;
@@ -698,24 +698,20 @@ let cdh='',dc=1,nc=1;const tc=Math.ceil((fd+dim)/7)*7;
 for(let i=0;i<tc;i++){let dn,oth=false,ds='';if(i<fd){dn=pd-fd+i+1;oth=true;const pm=tcalMo===0?11:tcalMo-1,py=tcalMo===0?tcalYr-1:tcalYr;ds=`${py}-${String(pm+1).padStart(2,'0')}-${String(dn).padStart(2,'0')}`}else if(dc>dim){dn=nc++;oth=true;const nm=tcalMo===11?0:tcalMo+1,ny=tcalMo===11?tcalYr+1:tcalYr;ds=`${ny}-${String(nm+1).padStart(2,'0')}-${String(dn).padStart(2,'0')}`}else{dn=dc++;ds=`${tcalYr}-${String(tcalMo+1).padStart(2,'0')}-${String(dn).padStart(2,'0')}`}
 const ist=!oth&&dn===today.getDate()&&tcalMo===today.getMonth()&&tcalYr===today.getFullYear();
 const dayTasks=tasks.filter(t=>t.dueDate===ds);
-// Group by category, merge Batch+Draft into BD
+// Group by category
 let itemsH='';
 const cats={};dayTasks.forEach(t=>{if(!cats[t.category])cats[t.category]=[];const author=getAuthorFromTask(t.text);const isDone=!!t.done||!!t.archived;if(!cats[t.category].find(x=>x.author===author&&x.done===isDone))cats[t.category].push({author,project:t.project,done:isDone})});
-// Merge Batch and Draft
 const merged={};
-if(cats['Batch']||cats['Draft']){const bdAuthors={};
-(cats['Batch']||[]).forEach(a=>{if(!bdAuthors[a.author])bdAuthors[a.author]={project:a.project,bDone:a.done,dDone:true};else bdAuthors[a.author].bDone=a.done});
-(cats['Draft']||[]).forEach(a=>{if(!bdAuthors[a.author])bdAuthors[a.author]={project:a.project,bDone:true,dDone:a.done};else bdAuthors[a.author].dDone=a.done});
-merged['BD']=Object.entries(bdAuthors).map(([author,d])=>({author,project:d.project,done:d.bDone&&d.dDone}))}
+if(cats['Batch'])merged['B']=cats['Batch'];
 if(cats['Post'])merged['Post']=cats['Post'];
-const catLabels={BD:'BD',Post:'P'};
+const catLabels={B:'B',Post:'P'};
 for(const[cat,authors]of Object.entries(merged)){itemsH+=`<div class="tcal-cat-row"><span class="tcal-cat-label">${catLabels[cat]||cat[0]}</span><div class="tcal-authors">${authors.map(a=>{const c=PROJ[a.project]?.color||'#999';return`<span class="tcal-author ${a.done?'tcal-done':''}" style="background:${c}15;color:${c}">${a.author}</span>`}).join('')}</div></div>`}
 cdh+=`<div class="cal-day ${oth?'oth':''} ${ist?'today':''}"><div class="cal-dn">${dn}</div><div class="tcal-day-tasks">${itemsH}</div></div>`}
 
 el.innerHTML=`<div class="sec-hd"><div class="sec-t">Agenda</div><button class="task-hd-add" onclick="openTaskModal()">+ Add Task</button></div>
 <div class="cal-hd"><div class="cal-nav"><button class="cal-nb" onclick="chTcMo(-1)">&#8249;</button><div class="cal-mo">${mos[tcalMo]} ${tcalYr}</div><button class="cal-nb" onclick="chTcMo(1)">&#8250;</button></div><button class="cal-today" onclick="goTcTd()">Today</button></div>
 <div class="cal-grid"><div class="cal-wk">${dys.map(d=>`<div class="cal-wd">${d}</div>`).join('')}</div><div class="cal-days">${cdh}</div></div>
-<div class="cal-legend"><div class="leg-i"><span style="font-size:.6rem;font-weight:700;color:var(--txt3);margin-right:2px">BD</span>Batch+Draft</div><div class="leg-i"><span style="font-size:.6rem;font-weight:700;color:var(--txt3);margin-right:2px">P</span>Post</div><div style="width:8px"></div><div class="leg-i"><div class="leg-d" style="background:var(--re)"></div>RE</div><div class="leg-i"><div class="leg-d" style="background:var(--dk)"></div>DK</div><div class="leg-i"><div class="leg-d" style="background:var(--pv)"></div>PV</div></div>`}
+<div class="cal-legend"><div class="leg-i"><span style="font-size:.6rem;font-weight:700;color:var(--txt3);margin-right:2px">B</span>Batch</div><div class="leg-i"><span style="font-size:.6rem;font-weight:700;color:var(--txt3);margin-right:2px">P</span>Post</div><div style="width:8px"></div><div class="leg-i"><div class="leg-d" style="background:var(--re)"></div>RE</div><div class="leg-i"><div class="leg-d" style="background:var(--dk)"></div>DK</div><div class="leg-i"><div class="leg-d" style="background:var(--pv)"></div>PV</div></div>`}
 function chTcMo(d){tcalMo+=d;if(tcalMo>11){tcalMo=0;tcalYr++}if(tcalMo<0){tcalMo=11;tcalYr--}renderTaskCal()}
 function goTcTd(){const t=new Date();tcalMo=t.getMonth();tcalYr=t.getFullYear();renderTaskCal()}
 
@@ -773,16 +769,21 @@ function rmI(i){edImgs.splice(i,1);refG()}
 async function dlI(i){
   try{
     const src=edImgs[i];
-    // For Storage URLs, fetch as blob and open in new tab for reliable mobile save
     const resp=await fetch(src);
     const blob=await resp.blob();
     const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url;a.download='slide_'+(i+1)+'.jpg';
-    // iOS Safari doesn't support download attr, so also open in new tab
-    if(/iPhone|iPad/i.test(navigator.userAgent)){window.open(url,'_blank')}
-    else{document.body.appendChild(a);a.click();document.body.removeChild(a)}
-    setTimeout(()=>URL.revokeObjectURL(url),5000);
+    if(/iPhone|iPad/i.test(navigator.userAgent)){
+      // iOS: open blob as image in new tab so long-press "Save to Photos" works
+      const w=window.open('','_blank');
+      if(w){w.document.write('<html><head><meta name="viewport" content="width=device-width"><title>Save Image</title><style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#000}img{max-width:100%;max-height:100vh;object-fit:contain}</style></head><body><img src="'+url+'"></body></html>');w.document.close()}
+      else{toast('Hold the image below to save');const overlay=document.createElement('div');overlay.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px';overlay.innerHTML='<p style="color:#fff;font-size:14px">Long-press image to save</p><img src="'+url+'" style="max-width:90%;max-height:80vh;border-radius:8px"><p style="color:#fff;font-size:14px;cursor:pointer;text-decoration:underline" onclick="this.parentElement.remove()">Close</p>';document.body.appendChild(overlay)}
+    }else{
+      const a=document.createElement('a');a.href=url;a.download='slide_'+(i+1)+'.jpg';
+      document.body.appendChild(a);a.click();document.body.removeChild(a)
+    }
+    setTimeout(()=>URL.revokeObjectURL(url),30000);
+  }catch(e){window.open(edImgs[i],'_blank')}
+}
   }catch(e){window.open(edImgs[i],'_blank')}
 }
 function setupDrop(){const z=document.getElementById('dz');if(!z)return;z.addEventListener('dragover',e=>{e.preventDefault();z.classList.add('over')});z.addEventListener('dragleave',()=>z.classList.remove('over'));z.addEventListener('drop',async e=>{e.preventDefault();z.classList.remove('over');await hFiles(e.dataTransfer.files)})}
@@ -800,7 +801,9 @@ for(let i=0;i<edImgs.length;i++){
     try{const url=await uploadToStorage(`users/${user.uid}/posts/${curAuthor.id}/${pid}/img_${i}.jpg`,edImgs[i]);finalImgs.push(url)}catch(e){toast('Image upload error');finalImgs.push(edImgs[i])}
   }else{finalImgs.push(edImgs[i])}
 }
-const d={hook:document.getElementById('hookI')?.value||'',slideshowTitle:document.getElementById('slideI')?.value||'',caption:document.getElementById('capI')?.value||'',hashtags:document.getElementById('tagI')?.value||'',scheduledDate:document.getElementById('schD')?.value||'',scheduledTime:document.getElementById('schT')?.value||'',status:selStatus,notes:document.getElementById('notI')?.value||'',context:document.getElementById('ctxI')?.value||'',images:finalImgs,updatedAt:Date.now()};try{await db.ref(`users/${user.uid}/posts/${curAuthor.id}/${pid}`).set(d);postsCache[pid]=d;curPostId=pid;toast('Saved!');goBack()}catch(e){toast('Error: '+e.message)}}
+const d={hook:document.getElementById('hookI')?.value||'',slideshowTitle:document.getElementById('slideI')?.value||'',caption:document.getElementById('capI')?.value||'',hashtags:document.getElementById('tagI')?.value||'',scheduledDate:document.getElementById('schD')?.value||'',scheduledTime:document.getElementById('schT')?.value||'',status:selStatus,notes:document.getElementById('notI')?.value||'',context:document.getElementById('ctxI')?.value||'',images:finalImgs,updatedAt:Date.now()};try{await db.ref(`users/${user.uid}/posts/${curAuthor.id}/${pid}`).set(d);postsCache[pid]=d;curPostId=pid;
+if(selStatus==='posted'&&curAuthor&&d.scheduledDate){const an=curAuthor.name.toLowerCase();const mt=tasks.find(t=>t.category==='Post'&&!t.done&&!t.archived&&t.dueDate===d.scheduledDate&&t.text.toLowerCase().includes(an));if(mt){await db.ref(`users/${user.uid}/tasks2/${mt.id}`).update({done:true,archived:true});toast('Saved & task checked off!')}else{toast('Saved!')}}else{toast('Saved!')}
+goBack()}catch(e){toast('Error: '+e.message)}}
 async function delPost(){if(!user||!curAuthor||!curPostId)return;if(!confirm('Delete this post?'))return;try{
 // Clean up Storage images
 const p=postsCache[curPostId];
