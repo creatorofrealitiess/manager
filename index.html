@@ -249,6 +249,9 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:v
 .p-card-img .no-img{font-size:1.4rem;opacity:.25}
 .p-card-status{position:absolute;top:5px;right:5px;padding:2px 6px;border-radius:10px;font-size:.55rem;font-weight:700;text-transform:uppercase;letter-spacing:.2px}
 .p-card-status.draft{background:var(--draft-bg);color:var(--draft)}.p-card-status.ready{background:var(--ready-bg);color:var(--ready)}.p-card-status.posted{background:var(--posted-bg);color:var(--posted)}
+.p-card-dup{position:absolute;bottom:5px;right:5px;width:26px;height:26px;border-radius:50%;border:none;background:rgba(0,0,0,.55);color:#fff;font-size:.8rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s}
+.p-card:hover .p-card-dup{opacity:1}
+@media(hover:none){.p-card-dup{opacity:.85}}
 .p-card-body{padding:7px 8px}
 .p-card-hook{font-weight:600;font-size:.72rem;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:2px}
 .p-card-meta{font-size:.62rem;color:var(--txt3)}
@@ -745,7 +748,7 @@ function setFilt(f){curFilter=f;renderAuthView()}
 
 function renderAuthorPosts(){const g=document.getElementById('postGrid');if(!g||!curAuthor)return;const data=allPosts[curAuthor.id]||{};postsCache=data;const posts=Object.entries(data).map(([id,p])=>({id,...p})).filter(p=>p.status===curFilter).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
 if(!posts.length){g.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-ic">&#128214;</div><div class="empty-t">No posts yet</div><div class="empty-s">Tap + to create your first post</div></div>';return}
-g.innerHTML=posts.map(p=>`<div class="p-card" onclick="showEd('${p.id}')"><div class="p-card-img">${p.images&&p.images[0]?`<img src="${p.images[0]}" alt="">`:'<div class="no-img">&#128214;</div>'}<div class="p-card-status ${p.status||'draft'}">${p.status||'draft'}</div></div><div class="p-card-body"><div class="p-card-hook">${esc(p.hook||'Untitled')}</div><div class="p-card-meta">${p.scheduledDate?'&#128197; '+p.scheduledDate:''}</div></div></div>`).join('')}
+g.innerHTML=posts.map(p=>`<div class="p-card" onclick="showEd('${p.id}')"><div class="p-card-img">${p.images&&p.images[0]?`<img src="${p.images[0]}" alt="">`:'<div class="no-img">&#128214;</div>'}<div class="p-card-status ${p.status||'draft'}">${p.status||'draft'}</div><button class="p-card-dup" onclick="duplicatePost('${curAuthor.id}','${p.id}',event)" title="Duplicate">&#10697;</button></div><div class="p-card-body"><div class="p-card-hook">${esc(p.hook||'Untitled')}</div><div class="p-card-meta">${p.scheduledDate?'&#128197; '+p.scheduledDate:''}</div></div></div>`).join('')}
 
 // EDITOR
 function renderEd(){const el=document.getElementById('pgEdit');const p=curPostId&&postsCache[curPostId]?postsCache[curPostId]:{};edImgs=[...(p.images||[])];selStatus=p.status||'draft';const st=(p.hashtags||'').split(/\s+/).filter(t=>t.startsWith('#'));
@@ -759,7 +762,7 @@ el.innerHTML=`<div class="ed-sec"><div class="ed-lb">&#128247; Slides</div><div 
 <div class="ed-sec"><div class="ed-lb">Status</div><div class="st-pick"><div class="st-opt ${selStatus==='draft'?'active':''}" data-s="draft" onclick="pSt(this,'draft')">Draft</div><div class="st-opt ${selStatus==='ready'?'active':''}" data-s="ready" onclick="pSt(this,'ready')">Ready</div><div class="st-opt ${selStatus==='posted'?'active':''}" data-s="posted" onclick="pSt(this,'posted')">Posted</div></div></div>
 <div class="ed-sec"><div class="col-hd" onclick="togCol(this)"><div class="ed-lb" style="margin:0">&#128221; Notes</div><span class="arr">&#9660;</span></div><div class="col-bd"><textarea class="ed-ta sm" id="notI" placeholder="Internal notes...">${esc(p.notes||'')}</textarea></div></div>
 <div class="ed-sec"><div class="col-hd" onclick="togCol(this)"><div class="ed-lb" style="margin:0">&#128218; Context</div><span class="arr">&#9660;</span></div><div class="col-bd"><textarea class="ed-ta sm" id="ctxI" placeholder="Book title, tropes...">${esc(p.context||'')}</textarea></div></div>
-<div style="height:70px"></div><div class="save-bar">${curPostId?'<button class="sv-btn out" onclick="delPost()">Delete</button>':''}<button class="sv-btn pri" onclick="savePost()">Save</button></div>`;setupDrop();setupPaste()}
+<div style="height:70px"></div><div class="save-bar">${curPostId?'<button class="sv-btn out" onclick="delPost()">Delete</button><button class="sv-btn out" onclick="duplicatePost()">Duplicate</button>':''}<button class="sv-btn pri" onclick="savePost()">Save</button></div>`;setupDrop();setupPaste()}
 
 function imgH(s,i){return`<div class="img-it"><img src="${s}" alt="" crossorigin="anonymous"><button class="img-sv" onclick="event.stopPropagation();dlI(${i})" title="Save">&#8595;</button><button class="img-rm" onclick="event.stopPropagation();rmI(${i})" title="Remove">&#10005;</button></div>`}
 function refG(){const g=document.getElementById('imgG');if(g)g.innerHTML=edImgs.map((img,i)=>imgH(img,i)).join('')}
@@ -807,6 +810,42 @@ async function delPost(){if(!user||!curAuthor||!curPostId)return;if(!confirm('De
 const p=postsCache[curPostId];
 if(p&&p.images){for(let i=0;i<p.images.length;i++){if(!isBase64(p.images[i])){try{await storage.refFromURL(p.images[i]).delete()}catch(e){}}}}
 await db.ref(`users/${user.uid}/posts/${curAuthor.id}/${curPostId}`).remove();delete postsCache[curPostId];toast('Deleted');goBack()}catch(e){toast('Error: '+e.message)}}
+
+// Duplicate a post. Works for any post (new or existing) given its author + id.
+// Copies every field, resets to draft, clears the schedule so you re-slot the copy,
+// reuses the same Storage image URLs (no re-upload), and opens the copy in the editor.
+async function duplicatePost(authorId,pid,ev){
+  if(ev)ev.stopPropagation();
+  if(!user)return;
+  const aid=authorId||(curAuthor&&curAuthor.id);
+  const srcId=pid||curPostId;
+  if(!aid||!srcId){toast('Nothing to duplicate');return}
+  const src=(allPosts[aid]&&allPosts[aid][srcId])||postsCache[srcId];
+  if(!src){toast('Post not found');return}
+  const newId=db.ref().push().key;
+  const copy={
+    hook:src.hook||'',
+    slideshowTitle:src.slideshowTitle||'',
+    caption:src.caption||'',
+    hashtags:src.hashtags||'',
+    scheduledDate:'',            // cleared so you pick a new date
+    scheduledTime:'',
+    status:'draft',              // copies always start as draft
+    notes:src.notes||'',
+    context:src.context||'',
+    images:Array.isArray(src.images)?[...src.images]:[],  // reuse existing URLs
+    updatedAt:Date.now()
+  };
+  try{
+    await db.ref(`users/${user.uid}/posts/${aid}/${newId}`).set(copy);
+    if(!allPosts[aid])allPosts[aid]={};allPosts[aid][newId]=copy;
+    if(curAuthor&&curAuthor.id===aid)postsCache[newId]=copy;
+    toast('Duplicated — opening copy');
+    // Jump into the copy so you can tweak + schedule it
+    curFilter='draft';
+    showEd(newId,aid);
+  }catch(e){toast('Error: '+e.message)}
+}
 
 // =============================================
 // FOLLOWER TRACKER
