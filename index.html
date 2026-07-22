@@ -543,6 +543,11 @@ async function uploadToStorage(path,dataUrl){
   return await ref.getDownloadURL();
 }
 
+// Unique, collision-proof filename for each uploaded image.
+// Index-based names (img_0, img_1...) collide across edits/duplicates/re-saves,
+// which orphans or overwrites files. A random id per image means no path is ever reused.
+function imgFileName(){return `img_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,10)}.jpg`}
+
 // Check if a string is a base64 data URL (not already a storage URL)
 function isBase64(s){return s&&typeof s==='string'&&s.startsWith('data:')}
 
@@ -573,7 +578,7 @@ async function migrateToStorage(){
       for(let i=0;i<newImgs.length;i++){
         if(isBase64(newImgs[i])){
           try{
-            const url=await uploadToStorage(`users/${user.uid}/posts/${aid}/${pid}/img_${i}.jpg`,newImgs[i]);
+            const url=await uploadToStorage(`users/${user.uid}/posts/${aid}/${pid}/${imgFileName()}`,newImgs[i]);
             newImgs[i]=url;
             changed=true;
             migrated++;
@@ -799,21 +804,52 @@ async function savePost(){if(!user||!curAuthor)return;const pid=curPostId||db.re
 const finalImgs=[];
 for(let i=0;i<edImgs.length;i++){
   if(isBase64(edImgs[i])){
-    try{const url=await uploadToStorage(`users/${user.uid}/posts/${curAuthor.id}/${pid}/img_${i}.jpg`,edImgs[i]);finalImgs.push(url)}catch(e){toast('Image upload error');finalImgs.push(edImgs[i])}
+    try{const url=await uploadToStorage(`users/${user.uid}/posts/${curAuthor.id}/${pid}/${imgFileName()}`,edImgs[i]);finalImgs.push(url)}catch(e){toast('Image upload error');finalImgs.push(edImgs[i])}
   }else{finalImgs.push(edImgs[i])}
 }
 const d={hook:document.getElementById('hookI')?.value||'',slideshowTitle:document.getElementById('slideI')?.value||'',caption:document.getElementById('capI')?.value||'',hashtags:document.getElementById('tagI')?.value||'',scheduledDate:document.getElementById('schD')?.value||'',scheduledTime:document.getElementById('schT')?.value||'',status:selStatus,notes:document.getElementById('notI')?.value||'',context:document.getElementById('ctxI')?.value||'',images:finalImgs,updatedAt:Date.now()};try{await db.ref(`users/${user.uid}/posts/${curAuthor.id}/${pid}`).set(d);postsCache[pid]=d;curPostId=pid;
 if(selStatus==='posted'&&curAuthor&&d.scheduledDate){const an=curAuthor.name.toLowerCase();const mt=tasks.find(t=>t.category==='Post'&&!t.done&&!t.archived&&t.dueDate===d.scheduledDate&&t.text.toLowerCase().includes(an));if(mt){await db.ref(`users/${user.uid}/tasks2/${mt.id}`).update({done:true,archived:true});toast('Saved & task checked off!')}else{toast('Saved!')}}else{toast('Saved!')}
 goBack()}catch(e){toast('Error: '+e.message)}}
 async function delPost(){if(!user||!curAuthor||!curPostId)return;if(!confirm('Delete this post?'))return;try{
-// Clean up Storage images
+// Clean up Storage images — but ONLY delete files no other post still references,
+// so deleting one post can never pull an image out from under another (e.g. an old duplicate).
 const p=postsCache[curPostId];
-if(p&&p.images){for(let i=0;i<p.images.length;i++){if(!isBase64(p.images[i])){try{await storage.refFromURL(p.images[i]).delete()}catch(e){}}}}
+if(p&&p.images){
+  for(let i=0;i<p.images.length;i++){
+    const url=p.images[i];
+    if(isBase64(url))continue;
+    if(imageUrlReferencedElsewhere(url,curAuthor.id,curPostId))continue; // shared — leave it
+    try{await storage.refFromURL(url).delete()}catch(e){}
+  }
+}
 await db.ref(`users/${user.uid}/posts/${curAuthor.id}/${curPostId}`).remove();delete postsCache[curPostId];toast('Deleted');goBack()}catch(e){toast('Error: '+e.message)}}
 
+// True if any OTHER post (any author) still lists this exact image URL.
+function imageUrlReferencedElsewhere(url,skipAid,skipPid){
+  for(const[aid,posts] of Object.entries(allPosts||{})){
+    for(const[pid,post] of Object.entries(posts||{})){
+      if(aid===skipAid&&pid===skipPid)continue;
+      if(post&&Array.isArray(post.images)&&post.images.includes(url))return true;
+    }
+  }
+  return false;
+}
+
+// Copy one already-uploaded Storage image into a brand-new file, returning the new URL.
+// Falls back to reusing the source URL only if the copy fails (better a shared ref than a broken one).
+async function copyStorageImage(srcUrl,destFolder){
+  try{
+    const resp=await fetch(srcUrl);
+    if(!resp.ok)throw new Error('fetch '+resp.status);
+    const blob=await resp.blob();
+    const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(blob)});
+    return await uploadToStorage(`${destFolder}/${imgFileName()}`,dataUrl);
+  }catch(e){console.log('Image copy failed, reusing source URL:',e);return srcUrl}
+}
+
 // Duplicate a post. Works for any post (new or existing) given its author + id.
-// Copies every field, resets to draft, clears the schedule so you re-slot the copy,
-// reuses the same Storage image URLs (no re-upload), and opens the copy in the editor.
+// Copies every field, resets to draft, clears the schedule, and DEEP-COPIES each image
+// into its own new Storage file so the copy never shares files with the original.
 async function duplicatePost(authorId,pid,ev){
   if(ev)ev.stopPropagation();
   if(!user)return;
@@ -823,6 +859,16 @@ async function duplicatePost(authorId,pid,ev){
   const src=(allPosts[aid]&&allPosts[aid][srcId])||postsCache[srcId];
   if(!src){toast('Post not found');return}
   const newId=db.ref().push().key;
+  toast('Duplicating...');
+  // Deep-copy images into the new post's own folder.
+  let newImages=[];
+  if(Array.isArray(src.images)&&src.images.length){
+    const destFolder=`users/${user.uid}/posts/${aid}/${newId}`;
+    for(const u of src.images){
+      if(isBase64(u)){newImages.push(u);continue}       // still base64? just carry it
+      newImages.push(await copyStorageImage(u,destFolder));
+    }
+  }
   const copy={
     hook:src.hook||'',
     slideshowTitle:src.slideshowTitle||'',
@@ -833,7 +879,7 @@ async function duplicatePost(authorId,pid,ev){
     status:'draft',              // copies always start as draft
     notes:src.notes||'',
     context:src.context||'',
-    images:Array.isArray(src.images)?[...src.images]:[],  // reuse existing URLs
+    images:newImages,            // its own files, never shared with the original
     updatedAt:Date.now()
   };
   try{
@@ -841,7 +887,6 @@ async function duplicatePost(authorId,pid,ev){
     if(!allPosts[aid])allPosts[aid]={};allPosts[aid][newId]=copy;
     if(curAuthor&&curAuthor.id===aid)postsCache[newId]=copy;
     toast('Duplicated — opening copy');
-    // Jump into the copy so you can tweak + schedule it
     curFilter='draft';
     showEd(newId,aid);
   }catch(e){toast('Error: '+e.message)}
