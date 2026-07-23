@@ -771,7 +771,7 @@ el.innerHTML=`<div class="ed-sec"><div class="ed-lb">&#128247; Slides</div><div 
 
 function imgH(s,i){return`<div class="img-it"><img src="${s}" alt="" crossorigin="anonymous"><button class="img-sv" onclick="event.stopPropagation();dlI(${i})" title="Save">&#8595;</button><button class="img-rm" onclick="event.stopPropagation();rmI(${i})" title="Remove">&#10005;</button></div>`}
 function refG(){const g=document.getElementById('imgG');if(g)g.innerHTML=edImgs.map((img,i)=>imgH(img,i)).join('')}
-async function hFiles(fs){for(const f of fs){if(!f.type.startsWith('image/'))continue;edImgs.push(await toDataUrl(f))}refG()}
+async function hFiles(fs){for(const f of fs){if(!f||!f.type.startsWith('image/'))continue;try{const d=await toDataUrl(f);if(d&&typeof d==='string'&&d.startsWith('data:image/'))edImgs.push(d)}catch(e){console.warn('Image read failed:',e)}}refG()}
 function toDataUrl(f){return new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(f)})}
 function rmI(i){edImgs.splice(i,1);refG()}
 async function dlI(i){
@@ -793,7 +793,31 @@ async function dlI(i){
   }catch(e){window.open(edImgs[i],'_blank')}
 }
 function setupDrop(){const z=document.getElementById('dz');if(!z)return;z.addEventListener('dragover',e=>{e.preventDefault();z.classList.add('over')});z.addEventListener('dragleave',()=>z.classList.remove('over'));z.addEventListener('drop',async e=>{e.preventDefault();z.classList.remove('over');await hFiles(e.dataTransfer.files)})}
-function setupPaste(){document.onpaste=async e=>{const items=e.clipboardData?.items;if(!items)return;for(const it of items){if(it.type.startsWith('image/')){e.preventDefault();edImgs.push(await toDataUrl(it.getAsFile()));refG()}}}}
+function setupPaste(){document.onpaste=async e=>{
+  const items=e.clipboardData?.items;if(!items)return;
+  // Capture files SYNCHRONOUSLY — clipboard items become invalid after the first await.
+  const files=[];
+  for(const it of items){
+    if(it.kind==='file'&&it.type.startsWith('image/')){
+      const f=it.getAsFile();
+      if(f)files.push(f);
+    }
+  }
+  if(!files.length)return;
+  e.preventDefault();
+  // A single copy often exposes the same image in several formats (png + jpeg).
+  // Keep just one per paste so pasting twice gives exactly two slides.
+  const seen=new Set();
+  const unique=files.filter(f=>{const k=f.size+'|'+f.type;if(seen.has(k))return false;seen.add(k);return true});
+  const chosen=unique.length>1?[unique[0]]:unique;
+  for(const f of chosen){
+    try{
+      const d=await toDataUrl(f);
+      if(d&&typeof d==='string'&&d.startsWith('data:image/'))edImgs.push(d);
+    }catch(err){console.warn('Paste image failed:',err)}
+  }
+  refG();
+}}
 function togTag(c,t){const inp=document.getElementById('tagI');const cur=inp.value.trim().split(/\s+/).filter(t=>t.startsWith('#'));if(cur.includes(t)){inp.value=cur.filter(x=>x!==t).join(' ');c.classList.remove('active')}else{inp.value=(inp.value.trim()?inp.value.trim()+' ':'')+t;c.classList.add('active')}}
 function pSt(el,s){selStatus=s;document.querySelectorAll('.st-opt').forEach(o=>o.classList.remove('active'));el.classList.add('active')}
 function togCol(h){h.classList.toggle('open');h.nextElementSibling.classList.toggle('open')}
@@ -803,9 +827,14 @@ async function savePost(){if(!user||!curAuthor)return;const pid=curPostId||db.re
 // Upload any base64 images to Storage first
 const finalImgs=[];
 for(let i=0;i<edImgs.length;i++){
-  if(isBase64(edImgs[i])){
-    try{const url=await uploadToStorage(`users/${user.uid}/posts/${curAuthor.id}/${pid}/${imgFileName()}`,edImgs[i]);finalImgs.push(url)}catch(e){toast('Image upload error');finalImgs.push(edImgs[i])}
-  }else{finalImgs.push(edImgs[i])}
+  const img=edImgs[i];
+  // Skip empty/invalid entries so a bad slot can never become a broken Storage reference.
+  if(!img||typeof img!=='string'){continue}
+  if(isBase64(img)){
+    if(!img.startsWith('data:image/')||img.length<100){console.warn('Skipping invalid image entry at slide',i+1);continue}
+    try{const url=await uploadToStorage(`users/${user.uid}/posts/${curAuthor.id}/${pid}/${imgFileName()}`,img);finalImgs.push(url)}
+    catch(e){toast('Image '+(i+1)+' failed to upload — not saved');console.warn('Upload failed, dropping slide',i+1,e)}
+  }else{finalImgs.push(img)}
 }
 const d={hook:document.getElementById('hookI')?.value||'',slideshowTitle:document.getElementById('slideI')?.value||'',caption:document.getElementById('capI')?.value||'',hashtags:document.getElementById('tagI')?.value||'',scheduledDate:document.getElementById('schD')?.value||'',scheduledTime:document.getElementById('schT')?.value||'',status:selStatus,notes:document.getElementById('notI')?.value||'',context:document.getElementById('ctxI')?.value||'',images:finalImgs,updatedAt:Date.now()};try{await db.ref(`users/${user.uid}/posts/${curAuthor.id}/${pid}`).set(d);postsCache[pid]=d;curPostId=pid;
 if(selStatus==='posted'&&curAuthor&&d.scheduledDate){const an=curAuthor.name.toLowerCase();const mt=tasks.find(t=>t.category==='Post'&&!t.done&&!t.archived&&t.dueDate===d.scheduledDate&&t.text.toLowerCase().includes(an));if(mt){await db.ref(`users/${user.uid}/tasks2/${mt.id}`).update({done:true,archived:true});toast('Saved & task checked off!')}else{toast('Saved!')}}else{toast('Saved!')}
