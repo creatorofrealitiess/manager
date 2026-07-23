@@ -611,7 +611,7 @@ function swTab(t){curTab=t;curAuthor=null;curPostId=null;navStack=[];document.qu
 
 function showAuth2(aid){curAuthor=AUTHORS.find(a=>a.id===aid);curFilter='draft';navStack.push('author');document.querySelectorAll('.page,.ed-page').forEach(p=>p.classList.remove('active'));document.getElementById('pgAuth').classList.add('active');document.getElementById('navBack').style.display='flex';document.getElementById('navBrand').style.display='none';document.getElementById('navTitle').style.display='block';document.getElementById('navTitle').textContent=curAuthor.name;document.getElementById('fab').classList.add('show');renderAuthView()}
 
-function showEd(pid,authId){if(authId){curAuthor=AUTHORS.find(a=>a.id===authId);postsCache=allPosts[authId]||{}}curPostId=pid||null;navStack.push('editor');document.querySelectorAll('.page,.ed-page').forEach(p=>p.classList.remove('active'));document.getElementById('pgEdit').classList.add('active');document.getElementById('navBack').style.display='flex';document.getElementById('navBrand').style.display='none';document.getElementById('navTitle').style.display='block';document.getElementById('navTitle').textContent=pid?'Edit Post':'New Post';document.getElementById('fab').classList.remove('show');document.getElementById('btabs').style.display='none';renderEd()}
+function showEd(pid,authId){if(authId){curAuthor=AUTHORS.find(a=>a.id===authId);postsCache=allPosts[authId]||{}}curPostId=pid||null;pendingPid=null;savingPost=false;navStack.push('editor');document.querySelectorAll('.page,.ed-page').forEach(p=>p.classList.remove('active'));document.getElementById('pgEdit').classList.add('active');document.getElementById('navBack').style.display='flex';document.getElementById('navBrand').style.display='none';document.getElementById('navTitle').style.display='block';document.getElementById('navTitle').textContent=pid?'Edit Post':'New Post';document.getElementById('fab').classList.remove('show');document.getElementById('btabs').style.display='none';renderEd()}
 
 function goBack(){navStack.pop();const prev=navStack[navStack.length-1];if(prev==='author'&&curAuthor){document.querySelectorAll('.page,.ed-page').forEach(p=>p.classList.remove('active'));document.getElementById('pgAuth').classList.add('active');document.getElementById('navTitle').textContent=curAuthor.name;document.getElementById('fab').classList.add('show');document.getElementById('btabs').style.display='flex';renderAuthView()}else{curAuthor=null;curPostId=null;navStack=[];document.getElementById('btabs').style.display='flex';swTab(curTab)}}
 function newPost(){showEd(null)}
@@ -823,7 +823,26 @@ function pSt(el,s){selStatus=s;document.querySelectorAll('.st-opt').forEach(o=>o
 function togCol(h){h.classList.toggle('open');h.nextElementSibling.classList.toggle('open')}
 function cpF(id,btn){const el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.value).then(()=>{btn.classList.add('copied');btn.textContent='Copied!';setTimeout(()=>{btn.classList.remove('copied');btn.textContent='Copy'},1500)})}
 function cpAll(){const h=document.getElementById('hookI')?.value||'',s=document.getElementById('slideI')?.value||'',c=document.getElementById('capI')?.value||'',t=document.getElementById('tagI')?.value||'';navigator.clipboard.writeText([h,s,c,t].filter(Boolean).join('\n\n')).then(()=>toast('Copied all fields'))}
-async function savePost(){if(!user||!curAuthor)return;const pid=curPostId||db.ref().push().key;
+let savingPost=false,pendingPid=null;
+async function savePost(){
+  if(!user||!curAuthor)return;
+  if(savingPost)return;              // already saving — ignore repeat taps
+  savingPost=true;
+  // Reuse a pending id if a previous attempt already minted one, so retries
+  // after a failure update the same post instead of creating another.
+  const pid=curPostId||pendingPid||db.ref().push().key;
+  pendingPid=pid;
+  const sb=document.querySelector('.save-bar .sv-btn.pri');
+  const sbTxt=sb?sb.textContent:'';
+  if(sb){sb.disabled=true;sb.textContent='Saving...';sb.style.opacity='.6'}
+  try{
+  return await doSavePost(pid);
+  }finally{
+    savingPost=false;
+    if(sb){sb.disabled=false;sb.textContent=sbTxt||'Save';sb.style.opacity=''}
+  }
+}
+async function doSavePost(pid){
 // Upload any base64 images to Storage first
 const finalImgs=[];
 for(let i=0;i<edImgs.length;i++){
