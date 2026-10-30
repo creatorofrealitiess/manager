@@ -1005,11 +1005,12 @@ function openFollEdit(aid){
     const follEls=document.querySelectorAll('.acc-foll, .auth-foll-row');
     follEls.forEach(el=>{
       // Find the one belonging to this author by checking onclick attributes
-      if(el.innerHTML.includes(aid)){
+      // Only touch the copy that's actually on screen — hidden pages keep stale cards too
+      if(el.offsetParent!==null&&el.innerHTML.includes(`'${aid}'`)){
         const curVal=f&&f.current!==undefined?f.current:'';
-        el.innerHTML=`<div class="foll-inline-edit"><input class="foll-inline-input" type="number" inputmode="numeric" value="" placeholder="${curVal||'Count'}" id="follInline_${aid}" onkeydown="if(event.key==='Enter')saveFollInline('${aid}');if(event.key==='Escape')cancelFollInline()"><button class="foll-inline-save" onclick="event.stopPropagation();saveFollInline('${aid}')">Save</button><button class="foll-inline-cancel" onclick="event.stopPropagation();cancelFollInline()">Cancel</button></div>`;
+        el.innerHTML=`<div class="foll-inline-edit"><input class="foll-inline-input" type="number" inputmode="numeric" value="" placeholder="${curVal||'Count'}" id="follInline_${aid}" onkeydown="if(event.key==='Enter')saveFollInline('${aid}',this);if(event.key==='Escape')cancelFollInline()"><button class="foll-inline-save" onclick="event.stopPropagation();saveFollInline('${aid}',this.previousElementSibling)">Save</button><button class="foll-inline-cancel" onclick="event.stopPropagation();cancelFollInline()">Cancel</button></div>`;
         el.onclick=e=>e.stopPropagation();
-        setTimeout(()=>{const inp=document.getElementById('follInline_'+aid);if(inp)inp.focus()},50);
+        setTimeout(()=>{const inp=el.querySelector('.foll-inline-input');if(inp)inp.focus()},50);
       }
     });
   }
@@ -1025,8 +1026,8 @@ async function saveFollModal(){
   closeFollModal();
 }
 
-async function saveFollInline(aid){
-  const inp=document.getElementById('follInline_'+aid);
+async function saveFollInline(aid,inp){
+  inp=inp||document.getElementById('follInline_'+aid);
   if(!inp)return;
   const val=parseInt(inp.value);
   if(isNaN(val)||val<0){toast('Please enter a valid number');return}
