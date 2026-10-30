@@ -17,7 +17,7 @@
   --border:#e8e6e1;--border-lt:#f0eeea;--txt:#1a1815;--txt2:#6b6660;--txt3:#a09a93;--txtW:#fff;
   --accent:#e85d3a;--accent-h:#d44e2d;--accent-lt:#fef0ec;
   --draft:#e5a832;--draft-bg:#fdf6e8;--ready:#2da562;--ready-bg:#edf7f1;--posted:#6366f1;--posted-bg:#eef0fe;
-  --re:#e85d3a;--dk:#6366f1;--pv:#d946a8;
+  --re:#e85d3a;--dk:#6366f1;--pv:#d946a8;--babu:#14a38b;
   --sh-s:0 1px 2px rgba(26,24,21,.04);--sh-m:0 4px 12px rgba(26,24,21,.06);--sh-l:0 8px 30px rgba(26,24,21,.08);--sh-h:0 8px 24px rgba(26,24,21,.1);
   --r-s:8px;--r-m:12px;--r-l:16px;
   --tr:all .2s ease;
@@ -125,6 +125,7 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:v
 .cal-item.proj-re{background:rgba(232,93,58,.12);color:var(--re)}
 .cal-item.proj-dk{background:rgba(99,102,241,.12);color:var(--dk)}
 .cal-item.proj-pv{background:rgba(217,70,168,.12);color:var(--pv)}
+.cal-item.proj-babu{background:rgba(20,163,139,.12);color:var(--babu)}
 .cal-thumb{width:16px;height:16px;border-radius:3px;object-fit:cover;flex-shrink:0}
 .cal-legend{display:flex;gap:16px;margin-top:14px;padding-left:4px;flex-wrap:wrap}
 .leg-i{display:flex;align-items:center;gap:5px;font-size:.72rem;color:var(--txt3)}
@@ -148,6 +149,7 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:v
 .task-sub-hd.proj-re{background:rgba(232,93,58,.06);border-bottom:1px solid rgba(232,93,58,.1)}
 .task-sub-hd.proj-dk{background:rgba(99,102,241,.06);border-bottom:1px solid rgba(99,102,241,.1)}
 .task-sub-hd.proj-pv{background:rgba(217,70,168,.06);border-bottom:1px solid rgba(217,70,168,.1)}
+.task-sub-hd.proj-babu{background:rgba(20,163,139,.06);border-bottom:1px solid rgba(20,163,139,.1)}
 .task-sub-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .task-sub-nm{font-size:.78rem;font-weight:600;color:var(--txt2)}
 .task-sub-arr{font-size:.7rem;color:var(--txt3);transition:var(--tr);margin-left:auto}
@@ -409,7 +411,7 @@ body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:v
       </div>
       <div class="task-modal-field">
         <label>Project</label>
-        <select id="tmProj"><option value="RE">Project RE</option><option value="DK">Project DK</option><option value="PV">Project PV</option></select>
+        <select id="tmProj"><option value="RE">Project RE</option><option value="DK">Project DK</option><option value="PV">Project PV</option><option value="BABU">Project Babu</option></select>
       </div>
     </div>
     <div class="task-modal-field">
@@ -513,15 +515,15 @@ const AUTHORS=[
   {id:'vedarosebooks',handle:'@vedarosebooks',init:'VR',project:'RE',name:'Veda'},
   {id:'lilablairbooks',handle:'@lilablairbooks',init:'LB',project:'RE',name:'Lila'},
   {id:'zaralibrary',handle:'@zaralibrary',init:'ZL',project:'RE',name:'Zara'},
-  {id:'livravenbooks',handle:'@livravenbooks',init:'LR',project:'RE',name:'Liv'},
   {id:'lysbookish',handle:'@lysbookish',init:'LK',project:'DK',name:'Lys'},
   {id:'lexiasherbooks',handle:'@lexiasherbooks',init:'LA',project:'DK',name:'Lexi'},
   {id:'larahartbooks',handle:'@larahartbooks',init:'LH',project:'PV',name:'Lara'},
+  {id:'ashbookish',handle:'@ashbookish',init:'SA',project:'BABU',name:'Ash'},
 ];
-const PROJ={RE:{name:'Project RE',color:'#e85d3a'},DK:{name:'Project DK',color:'#6366f1'},PV:{name:'Project PV',color:'#d946a8'}};
+const PROJ={RE:{name:'Project RE',color:'#e85d3a'},DK:{name:'Project DK',color:'#6366f1'},PV:{name:'Project PV',color:'#d946a8'},BABU:{name:'Project Babu',color:'#14a38b'}};
 const HTAGS=['#arrangedmarriage','#agegapromance','#enemiestolovers','#stalkerromance','#hockeyromance','#sportsromance','#mafiaromance','#billionaireromance','#brothersbestfriend','#enemiestoloversrecs','#bratvaromance','#forcedproximitybookrecs','#grumpysunshineromance','#bookboyfriend','#booktokbooks','#booktok','#bookish','#bookrecommendations','#booklover','#bookworm','#darkromance','#spicybooks','#romancebooks','#booktokfyp','#bookseries','#mustread','#bookobsessed','#morallygrey','#possessivehero','#forcedproximity','#bookstoread','#5starread','#bookclub','#fantasyromance','#romantasy'];
 const TASK_CATS=['Batch','Post'];
-const PROJ_KEYS=['RE','DK','PV'];
+const PROJ_KEYS=['RE','DK','PV','BABU'];
 
 let user=null,isSignUp=false,curTab='accounts',curAuthor=null,curPostId=null,curFilter='draft',postsCache={},allPosts={},edImgs=[],selStatus='draft',calMo=new Date().getMonth(),calYr=new Date().getFullYear(),calFilt='all',navStack=[],profilePics={},openCats={},openSubs={},followers={},follEditAuthor=null;
 
@@ -634,7 +636,7 @@ let itemsH='';
 if(calFilt==='all'){dp.forEach(p=>{itemsH+=`<div class="cal-item proj-${p.project.toLowerCase()}" onclick="event.stopPropagation();showEd('${p.pid}','${p.authorId}')">${p.authorName}</div>`})}else{dp.forEach(p=>{const thumb=p.images&&p.images[0]?`<img class="cal-thumb" src="${p.images[0]}" alt="">`:''
 itemsH+=`<div class="cal-item proj-${p.project.toLowerCase()}" onclick="event.stopPropagation();showEd('${p.pid}','${p.authorId}')">${thumb}<span style="overflow:hidden;text-overflow:ellipsis">${esc(p.hook||'Post')}</span></div>`})}
 cdh+=`<div class="cal-day ${oth?'oth':''} ${ist?'today':''}"><div class="cal-dn">${dn}</div>${itemsH}</div>`}
-el.innerHTML=`<div class="sec-hd"><div class="sec-t">Calendar</div></div>${fh}<div class="cal-hd"><div class="cal-nav"><button class="cal-nb" onclick="chMo(-1)">&#8249;</button><div class="cal-mo">${mos[calMo]} ${calYr}</div><button class="cal-nb" onclick="chMo(1)">&#8250;</button></div><button class="cal-today" onclick="goTd()">Today</button></div><div class="cal-grid"><div class="cal-wk">${dys.map(d=>`<div class="cal-wd">${d}</div>`).join('')}</div><div class="cal-days">${cdh}</div></div><div class="cal-legend"><div class="leg-i"><div class="leg-d" style="background:var(--re)"></div>RE</div><div class="leg-i"><div class="leg-d" style="background:var(--dk)"></div>DK</div><div class="leg-i"><div class="leg-d" style="background:var(--pv)"></div>PV</div></div>`}
+el.innerHTML=`<div class="sec-hd"><div class="sec-t">Calendar</div></div>${fh}<div class="cal-hd"><div class="cal-nav"><button class="cal-nb" onclick="chMo(-1)">&#8249;</button><div class="cal-mo">${mos[calMo]} ${calYr}</div><button class="cal-nb" onclick="chMo(1)">&#8250;</button></div><button class="cal-today" onclick="goTd()">Today</button></div><div class="cal-grid"><div class="cal-wk">${dys.map(d=>`<div class="cal-wd">${d}</div>`).join('')}</div><div class="cal-days">${cdh}</div></div><div class="cal-legend"><div class="leg-i"><div class="leg-d" style="background:var(--re)"></div>RE</div><div class="leg-i"><div class="leg-d" style="background:var(--dk)"></div>DK</div><div class="leg-i"><div class="leg-d" style="background:var(--pv)"></div>PV</div><div class="leg-i"><div class="leg-d" style="background:var(--babu)"></div>Babu</div></div>`}
 function chMo(d){calMo+=d;if(calMo>11){calMo=0;calYr++}if(calMo<0){calMo=11;calYr--}renderCal()}
 function goTd(){const t=new Date();calMo=t.getMonth();calYr=t.getFullYear();renderCal()}
 function setCF(f){calFilt=f;renderCal()}
@@ -697,8 +699,8 @@ el.innerHTML=h}
 function formatDate(ds){const d=new Date(ds+'T00:00:00');const opts={month:'short',day:'numeric'};return d.toLocaleDateString('en-US',opts)}
 
 // TASK CALENDAR
-const AUTHOR_NAMES=['Lys','Lexi','Zara','Liv','Lila','Veda','Lara'];
-function getAuthorFromTask(text){for(const n of AUTHOR_NAMES){if(text.toLowerCase().includes(n.toLowerCase()))return n}return text.substring(0,6)}
+const AUTHOR_NAMES=['Lys','Lexi','Zara','Lila','Veda','Lara','Ash'];
+function getAuthorFromTask(text){for(const n of AUTHOR_NAMES){if(new RegExp('\\b'+n+'\\b','i').test(text))return n}return text.substring(0,6)}
 let tcalMo=new Date().getMonth(),tcalYr=new Date().getFullYear();
 function renderTaskCal(){const el=document.getElementById('pgTaskCal');const mos=['January','February','March','April','May','June','July','August','September','October','November','December'];const dys=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];const todayStr=getLocalDateStr();
 const fd=new Date(tcalYr,tcalMo,1).getDay(),dim=new Date(tcalYr,tcalMo+1,0).getDate(),pd=new Date(tcalYr,tcalMo,0).getDate(),today=new Date();
@@ -719,7 +721,7 @@ cdh+=`<div class="cal-day ${oth?'oth':''} ${ist?'today':''}"><div class="cal-dn"
 el.innerHTML=`<div class="sec-hd"><div class="sec-t">Agenda</div><button class="task-hd-add" onclick="openTaskModal()">+ Add Task</button></div>
 <div class="cal-hd"><div class="cal-nav"><button class="cal-nb" onclick="chTcMo(-1)">&#8249;</button><div class="cal-mo">${mos[tcalMo]} ${tcalYr}</div><button class="cal-nb" onclick="chTcMo(1)">&#8250;</button></div><button class="cal-today" onclick="goTcTd()">Today</button></div>
 <div class="cal-grid"><div class="cal-wk">${dys.map(d=>`<div class="cal-wd">${d}</div>`).join('')}</div><div class="cal-days">${cdh}</div></div>
-<div class="cal-legend"><div class="leg-i"><span style="font-size:.6rem;font-weight:700;color:var(--txt3);margin-right:2px">B</span>Batch</div><div class="leg-i"><span style="font-size:.6rem;font-weight:700;color:var(--txt3);margin-right:2px">P</span>Post</div><div style="width:8px"></div><div class="leg-i"><div class="leg-d" style="background:var(--re)"></div>RE</div><div class="leg-i"><div class="leg-d" style="background:var(--dk)"></div>DK</div><div class="leg-i"><div class="leg-d" style="background:var(--pv)"></div>PV</div></div>`}
+<div class="cal-legend"><div class="leg-i"><span style="font-size:.6rem;font-weight:700;color:var(--txt3);margin-right:2px">B</span>Batch</div><div class="leg-i"><span style="font-size:.6rem;font-weight:700;color:var(--txt3);margin-right:2px">P</span>Post</div><div style="width:8px"></div><div class="leg-i"><div class="leg-d" style="background:var(--re)"></div>RE</div><div class="leg-i"><div class="leg-d" style="background:var(--dk)"></div>DK</div><div class="leg-i"><div class="leg-d" style="background:var(--pv)"></div>PV</div><div class="leg-i"><div class="leg-d" style="background:var(--babu)"></div>Babu</div></div>`}
 function chTcMo(d){tcalMo+=d;if(tcalMo>11){tcalMo=0;tcalYr++}if(tcalMo<0){tcalMo=11;tcalYr--}renderTaskCal()}
 function goTcTd(){const t=new Date();tcalMo=t.getMonth();tcalYr=t.getFullYear();renderTaskCal()}
 
