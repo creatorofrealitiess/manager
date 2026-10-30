@@ -599,7 +599,29 @@ async function migrateToStorage(){
   }
 }
 
-function loadAll(){if(!user)return;
+// ONE-TIME: move the drafts/posts that were parked under Liv's old account ID over to Ash.
+// Copies every post into ashbookish first, and only removes the old livravenbooks node after
+// the copy succeeds. Does nothing once livravenbooks is empty, so it's safe to leave in.
+async function migrateLivToAsh(){
+  if(!user)return;
+  try{
+    const from=db.ref(`users/${user.uid}/posts/livravenbooks`);
+    const snap=await from.once('value');
+    const posts=snap.val();
+    if(!posts)return;
+    const updates={};
+    for(const[pid,post]of Object.entries(posts)){updates[pid]=post}
+    await db.ref(`users/${user.uid}/posts/ashbookish`).update(updates);
+    // Verify every post landed before removing the originals
+    const check=(await db.ref(`users/${user.uid}/posts/ashbookish`).once('value')).val()||{};
+    if(Object.keys(posts).every(pid=>check[pid])){
+      await from.remove();
+      toast(`Moved ${Object.keys(posts).length} posts to Ash`);
+    }
+  }catch(e){console.log('Liv→Ash migration error:',e);toast('Could not move Liv\u2019s posts: '+e.message)}
+}
+
+function loadAll(){if(!user)return;migrateLivToAsh();
 // Restore cached data immediately for instant render
 const cachedPosts=cacheGet('posts');if(cachedPosts){allPosts=cachedPosts;if(curTab==='calendar')renderCal();if(curTab==='accounts')renderAcc()}
 const cachedPics=cacheGet('pics');if(cachedPics){profilePics=cachedPics;if(curTab==='accounts')renderAcc()}
